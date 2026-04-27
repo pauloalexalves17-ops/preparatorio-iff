@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Preparatório IFFluminense</title>
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link id="mainStylesheet" rel="stylesheet" href="styles.css" />
+    <script>
+      window.__IFF_ASSET_VERSION__ = String(Date.now());
+      const stylesheet = document.getElementById("mainStylesheet");
+      if (stylesheet) {
+        stylesheet.href = `styles.css?v=${window.__IFF_ASSET_VERSION__}`;
+      }
+    </script>
+  </head>
+  <body>
+    <svg class="icon-sprite" aria-hidden="true" focusable="false">
+      <symbol id="icon-search" viewBox="0 0 24 24">
+        <path d="m20 20-4.4-4.4m2.1-5.1a7.2 7.2 0 1 1-14.4 0 7.2 7.2 0 0 1 14.4 0Z" />
+      </symbol>
+      <symbol id="icon-list" viewBox="0 0 24 24">
+        <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" />
+      </symbol>
+      <symbol id="icon-file" viewBox="0 0 24 24">
+        <path d="M7 3h7l4 4v14H7z" />
+        <path d="M14 3v5h5M9.5 13h5M9.5 17h5" />
+      </symbol>
+      <symbol id="icon-tag" viewBox="0 0 24 24">
+        <path d="M4 12.4V5h7.4L20 13.6 13.6 20z" />
+        <path d="M8.5 8.5h.01" />
+      </symbol>
+      <symbol id="icon-pen" viewBox="0 0 24 24">
+        <path d="m4 20 4.8-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z" />
+        <path d="m14 7 3 3" />
+      </symbol>
+      <symbol id="icon-save" viewBox="0 0 24 24">
+        <path d="M5 4h12l2 2v14H5z" />
+        <path d="M8 4v6h7V4M8 20v-6h8v6" />
+      </symbol>
+      <symbol id="icon-open" viewBox="0 0 24 24">
+        <path d="M14 4h6v6M20 4l-9 9" />
+        <path d="M20 14v5H5V4h5" />
+      </symbol>
+      <symbol id="icon-filter" viewBox="0 0 24 24">
+        <path d="M4 6h16M7 12h10M10 18h4" />
+      </symbol>
+      <symbol id="icon-target" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="8" />
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+      </symbol>
+      <symbol id="icon-export" viewBox="0 0 24 24">
+        <path d="M12 3v11M8 10l4 4 4-4" />
+        <path d="M5 17v3h14v-3" />
+      </symbol>
+    </svg>
+
+    <header class="topbar">
+      <a class="brand" href="#questoes" aria-label="Preparatório IFFluminense">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span>
+          <strong>Preparatório IFF</strong>
+          <small>Provas, conteúdos e resoluções</small>
+        </span>
+      </a>
+
+      <nav class="tabs" aria-label="Navegação principal">
+        <button class="tab is-active" data-view="questoes" type="button">
+          <svg><use href="#icon-list"></use></svg>
+          <span>Questões</span>
+        </button>
+        <button class="tab" data-view="simulado" type="button">
+          <svg><use href="#icon-target"></use></svg>
+          <span>Simulado</span>
+        </button>
+        <button class="tab" data-view="provas" type="button">
+          <svg><use href="#icon-file"></use></svg>
+          <span>Provas</span>
+        </button>
+        <button class="tab" data-view="descritores" type="button">
+          <svg><use href="#icon-tag"></use></svg>
+          <span>Conteúdos</span>
+        </button>
+        <button class="tab" data-view="resolucoes" type="button">
+          <svg><use href="#icon-pen"></use></svg>
+          <span>Resoluções</span>
+        </button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="overview" aria-label="Resumo">
+        <div class="metric">
+          <span class="metric-label">Questões</span>
+          <strong id="statQuestions">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Com gabarito</span>
+          <strong id="statAnswers">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Com conteúdo</span>
+          <strong id="statDescriptors">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Anos</span>
+          <strong id="statYears">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Imagens</span>
+          <strong id="statImages">0</strong>
+        </div>
+        <div class="focus-strip" id="focusStrip"></div>
+      </section>
+
+      <section class="workspace">
+        <aside class="filters" aria-label="Filtros">
+          <div class="filter-title">
+            <svg><use href="#icon-filter"></use></svg>
+            <strong>Filtros</strong>
+          </div>
+
+          <label class="control search-control">
+            <span>Busca</span>
+            <span class="input-wrap">
+              <svg><use href="#icon-search"></use></svg>
+              <input id="searchInput" type="search" autocomplete="off" placeholder="texto, tema, questão" />
+            </span>
+          </label>
+
+          <label class="control">
+            <span>Ano</span>
+            <select id="yearFilter"></select>
+          </label>
+
+          <label class="control">
+            <span>Disciplina</span>
+            <select id="disciplineFilter"></select>
+          </label>
+
+          <label class="control">
+            <span>Prioridade</span>
+            <select id="priorityFilter">
+              <option value="all">Todas</option>
+              <option value="alta">Alta</option>
+              <option value="media">Média</option>
+              <option value="baixa">Baixa</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Conteúdo</span>
+            <select id="descriptorFilter"></select>
+          </label>
+
+          <label class="control">
+            <span>Gabarito</span>
+            <select id="answerFilter">
+              <option value="all">Todos</option>
+              <option value="A">A</option>
+              <option value="B">B</option>
+              <option value="C">C</option>
+              <option value="D">D</option>
+              <option value="E">E</option>
+              <option value="ANULADA">Anulada</option>
+              <option value="missing">Sem gabarito</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Resolução</span>
+            <select id="resolutionFilter">
+              <option value="all">Todas</option>
+              <option value="done">Com resolução</option>
+              <option value="todo">Pendentes</option>
+            </select>
+          </label>
+
+          <label class="control">
+            <span>Visual do PDF</span>
+            <select id="visualFilter">
+              <option value="all">Todas</option>
+              <option value="with-images">Com elemento visual</option>
+              <option value="without-images">Sem elemento visual</option>
+              <option value="pdf-needed">Pedir consulta ao PDF</option>
+            </select>
+          </label>
+
+          <button class="clear-button" id="clearFilters" type="button">Limpar filtros</button>
+        </aside>
+
+        <section class="view is-active" id="view-questoes" aria-label="Banco de questões">
+          <div class="section-head">
+            <div>
+              <h1>Banco de questões</h1>
+              <p id="resultCount">Carregando dados</p>
+            </div>
+            <button class="tool-button" id="moreButton" type="button">
+              <svg><use href="#icon-list"></use></svg>
+              <span>Mais questões</span>
+            </button>
+          </div>
+          <div class="study-now-banner" id="studyNowBanner" hidden></div>
+          <div class="question-list" id="questionList"></div>
+        </section>
+
+        <section class="view" id="view-simulado" aria-label="Simulado">
+          <div class="section-head">
+            <div>
+              <h1>Simulado</h1>
+              <p id="simulationCount">Monte um treino com a distribuicao real do IFF</p>
+            </div>
+          </div>
+          <div class="simulation-root" id="simulationRoot"></div>
+        </section>
+
+        <section class="view" id="view-provas" aria-label="Provas completas">
+          <div class="section-head">
+            <div>
+              <h1>Provas completas</h1>
+              <p id="sourceCount">Arquivos locais</p>
+            </div>
+          </div>
+          <div class="sources-layout">
+            <div class="source-list" id="sourceList"></div>
+            <div class="pdf-panel">
+              <div class="pdf-panel-head">
+                <strong id="pdfTitle">Selecione um PDF</strong>
+                <a class="tool-link" id="pdfOpenLink" href="#" target="_blank" rel="noreferrer">
+                  <svg><use href="#icon-open"></use></svg>
+                  <span>Abrir</span>
+                </a>
+              </div>
+              <iframe id="pdfViewer" title="Visualização do PDF"></iframe>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="view-descritores" aria-label="Conteúdos">
+          <div class="section-head">
+            <div>
+              <h1>Conteúdos</h1>
+              <p id="descriptorCount">Conteúdos cobrados</p>
+            </div>
+          </div>
+          <div class="descriptor-toolbar" id="descriptorToolbar"></div>
+          <div class="descriptor-list" id="descriptorList"></div>
+        </section>
+
+        <section class="view" id="view-resolucoes" aria-label="Resoluções">
+          <div class="section-head">
+            <div>
+              <h1>Resoluções</h1>
+              <p id="resolutionCount">Resoluções publicadas</p>
+            </div>
+          </div>
+          <div class="resolution-board" id="resolutionBoard"></div>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script type="module">
+      import(`./app.js?v=${window.__IFF_ASSET_VERSION__}`);
+    </script>
+  </body>
+</html>
