@@ -57,42 +57,219 @@ REFERENCE_MARKERS = [
     "adaptado.",
     "elaboracao propria",
     "apud",
+    "http://",
+    "https://",
+    "www.",
 ]
 
 ALTERNATIVE_BLEED_MARKERS = [
     r"\butilize o texto a seguir para responder\b",
     r"\bleia o texto a seguir para responder\b",
+    r"\bconsidere o texto a seguir\b",
+    r"\butilize o esquema a seguir\b",
+    r"\butilize a figura a seguir\b",
     r"\btexto\s+[ivxlcdm]+\b",
+    r"\btexto\s+\d+\b",
     r"\bcharge\s*\d+\b",
+    r"\bselecao\s+20\d{2}\b",
     r"\binstituto federal fluminense\b",
     r"\bpro-reitoria de ensino\b",
     r"\bcomissao de processos seletivos\b",
     r"\bdisponivel em:\b",
     r"\bacesso em:\b",
     r"\bfonte:\b",
+    r"\bhttps?://",
+    r"\bwww\.",
     r"\bedital\s*n\b",
     r"\bcursos\s+tecnicos\s+integr",
     r"\bcursos\s+tecnicos\s+concomit",
+    r"\btabela\s+periodica\b",
+    r"\blicenca\s+de\s+uso\s+creative\s+commons\b",
 ]
 
 ALTERNATIVE_BLEED_MARKERS_RAW = [
     r"\bUtilize o texto a seguir para responder\b",
     r"\bLeia o texto a seguir para responder\b",
+    r"\bConsidere o texto a seguir\b",
+    r"\bUtilize o esquema a seguir\b",
+    r"\bUtilize a figura a seguir\b",
     r"\bTexto\s+[IVXLCDM]+\b",
+    r"\bTexto\s+\d+\b",
     r"\bCharge\s*\d+\b",
+    r"\bSELEÇÃO\s+20\d{2}\b",
+    r"\bSele[çc][ãa]o\s+20\d{2}\b",
     r"\bInstituto Federal Fluminense\b",
     r"\bPR[ÓO]-REITORIA DE ENSINO\b",
     r"\bCOMISS[ÃA]O DE PROCESSOS SELETIVOS\b",
     r"\bDispon[ií]vel em:\b",
     r"\bAcesso em:\b",
     r"\bFonte:\b",
+    r"\bhttps?://",
+    r"\bwww\.",
     r"\bEdital\s*n[ºo°.]?\s*\d+",
     r"\bCursos\s+T[eé]cnicos\s+Integrados\b",
     r"\bCursos\s+T[eé]cnicos\s+Concomitantes\b",
     r"\bCurs\w*\s+T[eé]cnic\w*\s+Integrad\s*os\b",
     r"\bCurs\w*\s+T[eé]cnic\w*\s+Concomit\s*antes\b",
     r"\bEdit\s*al\s*n[ºo°.]?\s*\d+",
+    r"\bTabela\s+per[ií]odica\b",
+    r"\bLicen[çc]a\s+de\s+uso\s+Creative\s+Commons\b",
+    r"\bLi\s*6[,.]94\s*n[úu]mero\s+at[oô]mico\b",
 ]
+
+JOIN_STOPWORDS = {
+    "a",
+    "ao",
+    "aos",
+    "as",
+    "com",
+    "da",
+    "das",
+    "de",
+    "diz",
+    "do",
+    "dos",
+    "e",
+    "ela",
+    "elas",
+    "ele",
+    "eles",
+    "em",
+    "era",
+    "foi",
+    "isso",
+    "isto",
+    "mas",
+    "na",
+    "nas",
+    "nao",
+    "no",
+    "nos",
+    "o",
+    "os",
+    "ou",
+    "para",
+    "por",
+    "que",
+    "se",
+    "sem",
+    "ser",
+    "seu",
+    "seus",
+    "sua",
+    "suas",
+    "sao",
+    "tem",
+    "um",
+    "uma",
+}
+
+EXPLICIT_SPLIT_JOINS = {
+    ("a", "penas"): "apenas",
+    ("acom", "panha"): "acompanha",
+    ("adoles", "centes"): "adolescentes",
+    ("al", "ta"): "alta",
+    ("ambi", "ente"): "ambiente",
+    ("anti", "corpos"): "anticorpos",
+    ("aproxi", "madamente"): "aproximadamente",
+    ("apre", "senta"): "apresenta",
+    ("ausen", "cia"): "ausência",
+    ("bi", "ologos"): "biólogos",
+    ("bio", "logos"): "biólogos",
+    ("brasi", "leiras"): "brasileiras",
+    ("brasi", "leiro"): "brasileiro",
+    ("brasi", "leiros"): "brasileiros",
+    ("celu", "lares"): "celulares",
+    ("co", "mo"): "como",
+    ("comp", "oem"): "compõem",
+    ("comp", "ortamentos"): "comportamentos",
+    ("consi", "derando"): "considerando",
+    ("contex", "to"): "contexto",
+    ("corpo", "s"): "corpos",
+    ("cro", "sta"): "crosta",
+    ("da", "s"): "das",
+    ("de", "sde"): "desde",
+    ("des", "sa"): "dessa",
+    ("des", "se"): "desse",
+    ("desempe", "nho"): "desempenho",
+    ("dife", "rentes"): "diferentes",
+    ("do", "s"): "dos",
+    ("econo", "mico"): "econômico",
+    ("eletr", "ica"): "elétrica",
+    ("ene", "rgia"): "energia",
+    ("enca", "rregadas"): "encarregadas",
+    ("es", "sa"): "essa",
+    ("es", "se"): "esse",
+    ("es", "pecie"): "espécie",
+    ("es", "ta"): "esta",
+    ("es", "tava"): "estava",
+    ("escol", "as"): "escolas",
+    ("estru", "turas"): "estruturas",
+    ("expe", "ctativas"): "expectativas",
+    ("fragmen", "to"): "fragmento",
+    ("gra", "ficos"): "gráficos",
+    ("gra", "videz"): "gravidez",
+    ("his", "torico"): "histórico",
+    ("huma", "no"): "humano",
+    ("i", "deia"): "ideia",
+    ("i", "tem"): "item",
+    ("impor", "tante"): "importante",
+    ("indus", "tria"): "indústria",
+    ("info", "rmar"): "informar",
+    ("inter", "no"): "interno",
+    ("lem", "a"): "lema",
+    ("li", "ngua"): "língua",
+    ("li", "nguistica"): "linguística",
+    ("lin", "gua"): "língua",
+    ("lingua", "gem"): "linguagem",
+    ("linguis", "tica"): "linguística",
+    ("mai", "s"): "mais",
+    ("movi", "mentacao"): "movimentação",
+    ("mu", "ito"): "muito",
+    ("mun", "dial"): "mundial",
+    ("nes", "se"): "nesse",
+    ("ni", "vel"): "nível",
+    ("opi", "niao"): "opinião",
+    ("orga", "nela"): "organela",
+    ("orga", "nismos"): "organismos",
+    ("par", "a"): "para",
+    ("paragraf", "o"): "parágrafo",
+    ("pai", "s"): "país",
+    ("palavr", "a"): "palavra",
+    ("palavr", "as"): "palavras",
+    ("pel", "a"): "pela",
+    ("pel", "o"): "pelo",
+    ("pes", "soal"): "pessoal",
+    ("pes", "soas"): "pessoas",
+    ("po", "luicao"): "poluição",
+    ("po", "dem"): "podem",
+    ("por", "tugues"): "português",
+    ("pos", "itiva"): "positiva",
+    ("prese", "nte"): "presente",
+    ("pri", "meiro"): "primeiro",
+    ("princi", "pal"): "principal",
+    ("principal", "mente"): "principalmente",
+    ("qu", "e"): "que",
+    ("que", "da"): "queda",
+    ("raci", "al"): "racial",
+    ("reali", "zada"): "realizada",
+    ("recur", "so"): "recurso",
+    ("redu", "cao"): "redução",
+    ("regi", "oes"): "regiões",
+    ("respon", "savel"): "responsável",
+    ("rivali", "dade"): "rivalidade",
+    ("sang", "ue"): "sangue",
+    ("se", "guinte"): "seguinte",
+    ("se", "ntido"): "sentido",
+    ("se", "res"): "seres",
+    ("socieda", "de"): "sociedade",
+    ("so", "bre"): "sobre",
+    ("somen", "te"): "somente",
+    ("te", "xtual"): "textual",
+    ("us", "ina"): "usina",
+    ("vi", "da"): "vida",
+    ("vir", "tual"): "virtual",
+}
 
 STATEMENT_NOISE_PATTERNS = [
     r"\butilize o texto a seguir para responder\b",
@@ -263,7 +440,7 @@ def clean_question_text(text: str) -> str:
 
     compact = "\n".join(clean_lines)
     compact = re.sub(r"\n{3,}", "\n\n", compact).strip()
-    return compact
+    return clean_text_quality(compact)
 
 
 def normalize_search_text(*parts: object) -> str:
@@ -271,6 +448,298 @@ def normalize_search_text(*parts: object) -> str:
     normalized = unicodedata.normalize("NFKD", merged)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"\s+", " ", ascii_text).strip().lower()
+
+
+def match_replacement_case(source: str, replacement: str) -> str:
+    if source.isupper():
+        return replacement.upper()
+    if source[:1].isupper():
+        return replacement[:1].upper() + replacement[1:]
+    return replacement
+
+
+def repair_split_words(text: str) -> str:
+    if not text:
+        return text
+
+    word_pattern = re.compile(r"^[A-Za-zÀ-ÿ]{1,16}$")
+
+    def maybe_join(left: str, right: str) -> str | None:
+        left_key = normalize_search_text(left)
+        right_key = normalize_search_text(right)
+
+        explicit = EXPLICIT_SPLIT_JOINS.get((left_key, right_key))
+        if explicit:
+            return match_replacement_case(left + right, explicit)
+
+        if not right[:1].islower():
+            return None
+        if left_key in JOIN_STOPWORDS or right_key in JOIN_STOPWORDS:
+            return None
+        if len(left_key) > 12 or len(right_key) > 16:
+            return None
+        if len(left_key) == 1 or len(right_key) == 1:
+            return f"{left}{right}"
+        return None
+
+    previous = None
+    repaired = text
+    while repaired != previous:
+        previous = repaired
+        pieces = re.split(r"(\s+)", repaired)
+        rebuilt: list[str] = []
+        index = 0
+        while index < len(pieces):
+            current = pieces[index]
+            if (
+                index + 2 < len(pieces)
+                and word_pattern.fullmatch(current)
+                and pieces[index + 1].isspace()
+                and word_pattern.fullmatch(pieces[index + 2] or "")
+            ):
+                joined = maybe_join(current, pieces[index + 2])
+                if joined:
+                    rebuilt.append(joined)
+                    index += 3
+                    continue
+            rebuilt.append(current)
+            index += 1
+        repaired = "".join(rebuilt)
+    return repaired
+
+
+def clean_text_quality(text: str) -> str:
+    if not text:
+        return text
+
+    cleaned = text
+    cleaned = re.sub(r"[ \t]+", " ", cleaned)
+    cleaned = re.sub(r"(?<=\w)\s+([,.;:!?%])", r"\1", cleaned)
+    cleaned = re.sub(r"([(\[{“\"'])\s+", r"\1", cleaned)
+    cleaned = re.sub(r"\s+([)\]}”\"'])", r"\1", cleaned)
+    cleaned = re.sub(r"(?<=\w)\s*-\s+(?=\w)", "-", cleaned)
+    cleaned = re.sub(r"(?<=\d)\s+%", "%", cleaned)
+    cleaned = repair_split_words(cleaned)
+    cleaned = re.sub(r" +\n", "\n", cleaned)
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned.strip()
+
+
+SUPERSCRIPT_MAP = {
+    "2": "²",
+    "3": "³",
+}
+
+
+def improve_simple_math_readability(text: str) -> str:
+    if not text:
+        return text
+
+    improved = text
+    improved = re.sub(r"([,;:])(?=[A-Za-zÀ-ÿ])", r"\1 ", improved)
+    improved = re.sub(r"(?<=\d)\s*/\s*(?=\d)", "/", improved)
+    improved = re.sub(r"(?<=\d)\s*([+\-=])\s*(?=\d)", r" \1 ", improved)
+    improved = re.sub(r"(?<=[A-Za-z0-9)])\s*([+\-=])\s*(?=[A-Za-z0-9(])", r" \1 ", improved)
+    improved = re.sub(r"√\s+", "√", improved)
+
+    unit_pattern = re.compile(
+        r"\b(km|hm|dam|m|dm|cm|mm|m|cm|mm)\s*([23])\b",
+        flags=re.IGNORECASE,
+    )
+
+    def replace_unit(match: re.Match[str]) -> str:
+        unit = match.group(1)
+        exponent = SUPERSCRIPT_MAP.get(match.group(2), match.group(2))
+        return f"{unit}{exponent}"
+
+    improved = unit_pattern.sub(replace_unit, improved)
+
+    variable_pattern = re.compile(
+        r"(?:(?<=^)|(?<=[=(\[{\-+*/:]))([xyzabc])([23])\b",
+        flags=re.IGNORECASE,
+    )
+    variable_spaced_pattern = re.compile(
+        r"(?:(?<=^)|(?<=[=(\[{\-+*/:]))([xyzabc])\s+([23])\b",
+        flags=re.IGNORECASE,
+    )
+
+    def replace_variable(match: re.Match[str]) -> str:
+        variable = match.group(1)
+        exponent = SUPERSCRIPT_MAP.get(match.group(2), match.group(2))
+        return f"{variable}{exponent}"
+
+    improved = variable_pattern.sub(replace_variable, improved)
+    improved = variable_spaced_pattern.sub(replace_variable, improved)
+    improved = re.sub(r"\s{2,}", " ", improved)
+    return clean_text_quality(improved)
+
+
+def needs_latex_review(text: str) -> bool:
+    if not text:
+        return False
+    normalized = str(text)
+    return bool(
+        re.search(r"\b[a-z]\s*\^\s*\d", normalized, flags=re.IGNORECASE)
+        or re.search(r"√\s*\(", normalized)
+        or len(re.findall(r"(?<=\d)/(?=\d)", normalized)) >= 2
+        or re.search(r"\([^)]+\)\s*[²³]", normalized)
+    )
+
+
+def apply_question_specific_text_fixes(
+    question_id: str,
+    statement: str,
+    support_text: str,
+    reference_lines: list[str],
+    alternatives: list[dict[str, str]],
+) -> tuple[str, str, list[str], list[dict[str, str]]]:
+    fixed_statement = statement
+    fixed_support = support_text
+    fixed_references = [str(item).strip() for item in reference_lines if str(item).strip()]
+    fixed_alternatives = [
+        {
+            "letter": str(item.get("letter") or "").strip(),
+            "text": str(item.get("text") or "").strip(),
+        }
+        for item in alternatives
+    ]
+
+    def replace_many(text: str, replacements: list[tuple[str, str]]) -> str:
+        updated = text
+        for source, target in replacements:
+            updated = updated.replace(source, target)
+        return clean_text_quality(updated)
+
+    def update_alternative(letter: str, replacements: list[tuple[str, str]]) -> None:
+        for alternative in fixed_alternatives:
+            if str(alternative.get("letter") or "").upper() == letter.upper():
+                alternative["text"] = replace_many(str(alternative.get("text") or ""), replacements)
+                break
+
+    if question_id == "2012-39":
+        update_alternative("B", [("ch argista", "chargista")])
+        for alternative in fixed_alternatives:
+            if str(alternative.get("letter") or "").upper() == "E":
+                text = str(alternative.get("text") or "")
+                bleed_marker = "Charge de Eugênio Neves sobre a remoção"
+                if bleed_marker in text:
+                    text = text.split(bleed_marker, 1)[0].rstrip()
+                alternative["text"] = clean_text_quality(text)
+                break
+
+    if question_id == "2015-13":
+        fixed_support = replace_many(fixed_support, [("me sma", "mesma")])
+        fixed_support = re.sub(r"\n\s*[a-eA-E]\)\s*(?=\n|$)", "", fixed_support)
+        fixed_support = re.sub(r"\n{3,}", "\n\n", fixed_support).strip()
+        if "probabilidade de parar em um número racional?" in fixed_support:
+            fixed_statement = (
+                "O círculo a seguir foi dividido em 10 setores de mesma medida. "
+                "Ao girar uma única vez o ponteiro, qual será a probabilidade de parar em um número racional?"
+            )
+            fixed_support = ""
+
+    if question_id in {"2015-36", "2015-39", "2015-40"}:
+        fixed_statement = re.sub(
+            r"\n*\s*Cursos Técnicos Integrad[\s\S]*$",
+            "",
+            fixed_statement,
+            flags=re.IGNORECASE,
+        ).strip()
+
+    if question_id == "2015-36":
+        fixed_statement = replace_many(fixed_statement, [("mo vimentos", "movimentos")])
+
+    if question_id == "2015-39":
+        fixed_statement = replace_many(fixed_statement, [("brasileir a", "brasileira")])
+        update_alternative("A", [("di stribuída", "distribuída")])
+        update_alternative("B", [("Su l", "Sul")])
+        fixed_references = [replace_many(item, [("07out", "07 out")]) for item in fixed_references]
+
+    if question_id == "2015-40":
+        for alternative in fixed_alternatives:
+            text = str(alternative.get("text") or "")
+            text = re.sub(r"(\d{2}) o (\d{2}'[NS])", r"\1º \2", text)
+            alternative["text"] = clean_text_quality(text)
+
+    if question_id == "2016-24":
+        fixed_statement = replace_many(fixed_statement, [("e xperimentos", "experimentos")])
+        update_alternative("B", [("A gCl", "AgCl")])
+        update_alternative("C", [("C12 H22 O11", "C12H22O11")])
+        update_alternative("D", [("Na 2SO 4", "Na2SO4")])
+        update_alternative("E", [("N a 2SO 4", "Na2SO4")])
+
+    if question_id == "2017-25":
+        fixed_statement = replace_many(
+            fixed_statement,
+            [
+                ("estrutu ras", "estruturas"),
+                ("evidênciasp odem", "evidências podem"),
+                ("alterna tiva", "alternativa"),
+            ],
+        )
+        update_alternative("B", [("eviden ciar", "evidenciar")])
+        update_alternative("C", [("comparars equências", "comparar sequências")])
+
+    if question_id == "2018-08":
+        fixed_statement = replace_many(fixed_statement, [("estad os", "estados")])
+
+    if question_id == "2018-10":
+        fixed_support = replace_many(fixed_support, [("sej a", "seja")])
+        fixed_statement = replace_many(fixed_statement, [("lingu ística", "linguística")])
+        update_alternative("A", [("estives se", "estivesse")])
+        update_alternative("B", [("es crever", "escrever")])
+        update_alternative("C", [("ca rne", "carne")])
+        for alternative in fixed_alternatives:
+            if str(alternative.get("letter") or "").upper() == "E":
+                text = str(alternative.get("text") or "")
+                bleed_marker = "Fragmentos do livro Quarto de despejo disponíveis em: <"
+                if bleed_marker in text:
+                    text = text.split(bleed_marker, 1)[0].rstrip()
+                alternative["text"] = clean_text_quality(text)
+                break
+
+    if question_id == "2024-25":
+        fixed_support = replace_many(
+            fixed_support,
+            [
+                ("Nacional) ,", "Nacional),"),
+                ("Região Sul\n\nFluminense", "Região Sul Fluminense"),
+            ],
+        )
+
+    if question_id == "2026-13":
+        fixed_statement = replace_many(
+            fixed_statement,
+            [
+                ("a2,54 cm", "a 2,54 cm"),
+                ("diagonal,uma", "diagonal, uma"),
+            ],
+        )
+
+    fixed_references = [
+        replace_many(
+            item,
+            [
+                ("Adaptado:<", "Adaptado: <"),
+                ("Disponível em:<", "Disponível em: <"),
+                ("2010.p.", "2010. p."),
+            ],
+        )
+        for item in fixed_references
+    ]
+
+    fixed_statement = clean_text_quality(fixed_statement)
+    fixed_support = clean_text_quality(fixed_support)
+    fixed_references = [clean_text_quality(item) for item in fixed_references if clean_text_quality(item)]
+    fixed_alternatives = [
+        {
+            "letter": str(item.get("letter") or "").strip().upper(),
+            "text": clean_text_quality(str(item.get("text") or "")),
+        }
+        for item in fixed_alternatives
+        if str(item.get("letter") or "").strip()
+    ]
+    return fixed_statement, fixed_support, fixed_references, fixed_alternatives
 
 
 def split_paragraphs(text: str) -> list[str]:
@@ -333,7 +802,7 @@ def trim_alternative_noise(text: str) -> str:
         cut_at = min(cut_positions)
         text = text[:cut_at]
     text = re.sub(r"\s+", " ", text).strip(" -–—:;")
-    return text
+    return clean_text_quality(text)
 
 
 def is_question_tail_paragraph(text: str) -> bool:
@@ -381,9 +850,9 @@ def structure_question_prompt(prompt: str) -> dict[str, object]:
         texto_apoio = ""
 
     return {
-        "statement": statement,
-        "textoApoio": texto_apoio,
-        "fonteReferencia": references,
+        "statement": clean_text_quality(statement),
+        "textoApoio": clean_text_quality(texto_apoio),
+        "fonteReferencia": [clean_text_quality(item) for item in references],
     }
 
 
@@ -407,6 +876,8 @@ def infer_support_types(
 
 def manual_review_reasons(question: dict[str, object]) -> list[str]:
     reasons: list[str] = []
+    question_id = str(question.get("id") or "")
+    discipline = str(question.get("discipline") or "")
     statement = str(question.get("statement") or "")
     support_text = str(question.get("textoApoio") or "")
     alternatives = question.get("alternatives") or []
@@ -422,6 +893,16 @@ def manual_review_reasons(question: dict[str, object]) -> list[str]:
         if contains_bleed_marker(text) or contains_reference_marker(text):
             reasons.append("alternativa_com_texto_estranho")
             break
+    if discipline == "Matemática":
+        math_text = "\n".join(
+            [statement, support_text]
+            + [str(alternative.get("text") or "") for alternative in alternatives]
+        )
+        if needs_latex_review(math_text):
+            reasons.append("expressao_complexa_para_latex")
+
+    if question_id == "2015-13" and len(alternatives) < 2:
+        reasons.append("alternativas_nao_extraidas")
 
     unique_reasons = []
     for reason in reasons:
@@ -905,6 +1386,7 @@ def split_statement_and_alternatives(text: str) -> tuple[str, str, list[dict[str
 
     prompt = "\n".join(compact_prompt_lines).strip()
     prompt = re.sub(r"\n{3,}", "\n\n", prompt)
+    prompt = clean_text_quality(prompt)
     cleaned_alternatives = [
         {"letter": item["letter"], "text": trim_alternative_noise(item["text"])}
         for item in selected_alternatives
@@ -1485,6 +1967,26 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
                 for item in (structured_prompt.get("fonteReferencia") or [])
                 if str(item).strip()
             ]
+            statement, support_text, reference_lines, alternatives = apply_question_specific_text_fixes(
+                question_id,
+                statement,
+                support_text,
+                reference_lines,
+                alternatives,
+            )
+            if discipline == "Matemática":
+                statement = improve_simple_math_readability(statement)
+                support_text = improve_simple_math_readability(support_text)
+                reference_lines = [
+                    improve_simple_math_readability(item) for item in reference_lines
+                ]
+                alternatives = [
+                    {
+                        **item,
+                        "text": improve_simple_math_readability(str(item.get("text") or "")),
+                    }
+                    for item in alternatives
+                ]
             descriptor_details = []
             for code in descriptor_codes:
                 detail = descriptor_matrix.get(f"{discipline}::{code}")

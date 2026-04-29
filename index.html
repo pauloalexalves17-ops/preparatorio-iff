@@ -16,7 +16,7 @@
       }
     </script>
   </head>
-  <body>
+  <body class="access-locked">
     <svg class="icon-sprite" aria-hidden="true" focusable="false">
       <symbol id="icon-search" viewBox="0 0 24 24">
         <path d="m20 20-4.4-4.4m2.1-5.1a7.2 7.2 0 1 1-14.4 0 7.2 7.2 0 0 1 14.4 0Z" />
@@ -58,6 +58,42 @@
       </symbol>
     </svg>
 
+    <section class="access-gate" id="accessGate" aria-label="Acesso ao sistema">
+      <div class="access-card">
+        <div class="access-card-head">
+          <span class="brand-mark access-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+          <div>
+            <strong>Preparatório IFF</strong>
+            <p>Digite a senha para liberar a plataforma.</p>
+          </div>
+        </div>
+
+        <form class="access-form" id="accessForm">
+          <label class="control">
+            <span>Senha de acesso</span>
+            <input
+              id="accessPasswordInput"
+              class="access-input"
+              type="password"
+              inputmode="text"
+              autocomplete="current-password"
+              placeholder="Digite a senha"
+              required
+            />
+          </label>
+
+          <p class="access-error" id="accessError" role="alert" hidden></p>
+
+          <button class="tool-button access-submit" id="accessSubmit" type="submit">
+            Entrar
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <div id="appShell" aria-hidden="true">
     <header class="topbar">
       <a class="brand" href="#questoes" aria-label="Preparatório IFFluminense">
         <span class="brand-mark" aria-hidden="true">
@@ -72,11 +108,11 @@
       <nav class="tabs" aria-label="Navegação principal">
         <button class="tab is-active" data-view="questoes" type="button">
           <svg><use href="#icon-list"></use></svg>
-          <span>Questões</span>
+          <span>Estudar questões</span>
         </button>
         <button class="tab" data-view="simulado" type="button">
           <svg><use href="#icon-target"></use></svg>
-          <span>Simulado</span>
+          <span>Fazer simulado</span>
         </button>
         <button class="tab" data-view="provas" type="button">
           <svg><use href="#icon-file"></use></svg>
@@ -197,7 +233,7 @@
         <section class="view is-active" id="view-questoes" aria-label="Banco de questões">
           <div class="section-head">
             <div>
-              <h1>Banco de questões</h1>
+              <h1>Estudar por questões</h1>
               <p id="resultCount">Carregando dados</p>
             </div>
             <button class="tool-button" id="moreButton" type="button">
@@ -212,8 +248,8 @@
         <section class="view" id="view-simulado" aria-label="Simulado">
           <div class="section-head">
             <div>
-              <h1>Simulado</h1>
-              <p id="simulationCount">Monte um treino com a distribuicao real do IFF</p>
+              <h1>Fazer simulado</h1>
+              <p id="simulationCount">Escolha um formato para treinar como na prova do IFF</p>
             </div>
           </div>
           <div class="simulation-root" id="simulationRoot"></div>
@@ -265,6 +301,7 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    </div>
 
     <script type="module">
       import(`./app.js?v=${window.__IFF_ASSET_VERSION__}`);

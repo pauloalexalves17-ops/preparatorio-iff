@@ -3,6 +3,8 @@ import { createSimuladoApi } from "./simulados.js";
 const PAGE_SIZE = 80;
 const ASSET_VERSION =
   window.__IFF_ASSET_VERSION__ || document.documentElement.dataset.assetVersion || "dev";
+const ACCESS_PASSWORD = "iff2026";
+const ACCESS_STORAGE_KEY = "iff_access_granted_v1";
 
 /**
  * @typedef {{ letter: string, text: string }} Alternativa
@@ -42,6 +44,11 @@ const ASSET_VERSION =
 const state = {
   catalog: null,
   simulados: null,
+  access: {
+    granted: false,
+    bootstrapped: false,
+    bootPromise: null,
+  },
   simuladoSession: createEmptySimulationSession(),
   studyFocus: createEmptyStudyFocus(),
   view: "questoes",
@@ -78,15 +85,15 @@ const disciplineOrder = [
 ];
 
 const simulationTypeLabels = {
-  "simulado-rapido": "Simulado rapido (10)",
-  "simulado-medio": "Simulado medio (20)",
+  "simulado-rapido": "Simulado rápido (10)",
+  "simulado-medio": "Simulado médio (20)",
   "simulado-completo": "Simulado completo (40)",
   "treino-por-disciplina": "Treino por disciplina (10)",
 };
 
 const simulationModeLabels = {
-  rapido: "Simulado rapido (10)",
-  medio: "Simulado medio (20)",
+  rapido: "Simulado rápido (10)",
+  medio: "Simulado médio (20)",
   completo: "Simulado completo (40)",
   treino: "Treino por disciplina (10)",
 };
@@ -112,6 +119,22 @@ function createEmptyStudyFocus() {
     contentLabel: "",
     prioritizedQuestionIds: [],
   };
+}
+
+function readStoredAccess() {
+  try {
+    return window.localStorage.getItem(ACCESS_STORAGE_KEY) === "true";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function writeStoredAccess(granted) {
+  try {
+    window.localStorage.setItem(ACCESS_STORAGE_KEY, granted ? "true" : "false");
+  } catch (_error) {
+    // localStorage may be unavailable; keep the in-memory flow working.
+  }
 }
 
 function escapeHtml(value) {
@@ -249,6 +272,38 @@ function normalizeContentSummary(value, discipline = "") {
 
 function contentKey(discipline, label) {
   return `${discipline}::${label}`;
+}
+
+function setAccessError(message = "") {
+  const errorNode = $("#accessError");
+  if (!errorNode) return;
+  errorNode.textContent = message;
+  errorNode.hidden = !message;
+}
+
+function setAccessLoading(loading) {
+  const submit = $("#accessSubmit");
+  const input = $("#accessPasswordInput");
+  if (submit) {
+    submit.disabled = loading;
+    submit.textContent = loading ? "Liberando..." : "Entrar";
+  }
+  if (input) input.disabled = loading;
+}
+
+function applyAccessState(granted) {
+  state.access.granted = granted;
+  document.body.classList.toggle("access-locked", !granted);
+  const gate = $("#accessGate");
+  const appShell = $("#appShell");
+  if (gate) gate.hidden = granted;
+  if (appShell) {
+    if (granted) appShell.removeAttribute("aria-hidden");
+    else appShell.setAttribute("aria-hidden", "true");
+  }
+  if (!granted) {
+    window.setTimeout(() => $("#accessPasswordInput")?.focus(), 40);
+  }
 }
 
 function buildContentPool(questions) {
@@ -392,7 +447,7 @@ function contentSummaryText(question) {
 function contentFilterChip(question) {
   const label = contentSummary(question);
   if (!label) {
-    return '<p class="question-support is-missing">Conteudo nao classificado para esta questao.</p>';
+    return '<p class="question-support is-missing">Conteúdo não classificado para esta questão.</p>';
   }
   return `
     <div class="descriptor-chips">
@@ -682,7 +737,7 @@ function referenceMarkup(question) {
   if (!question.fonteReferencia?.length) return "";
   return `
     <section class="reference-block">
-      <strong class="support-title">Fonte / referencia</strong>
+      <strong class="support-title">Fonte / referência</strong>
       <div class="reference-list">
         ${question.fonteReferencia
           .map((item) => `<p class="reference-item">${escapeHtml(item)}</p>`)
@@ -799,10 +854,10 @@ function renderQuestions() {
             prioritizedCount
               ? `As primeiras ${countLabel(
                   prioritizedCount,
-                  "questao",
-                  "questoes",
-                )} sao as que voce errou ou deixou em branco no ultimo simulado desse conteudo.`
-              : "Aqui estao as questoes desse conteudo para voce continuar estudando."
+                  "questão",
+                  "questões",
+                )} são as que você errou ou deixou em branco no último simulado desse conteúdo.`
+              : "Aqui estão as questões desse conteúdo para você continuar estudando."
           }</span>
         `
         : "";
@@ -1190,42 +1245,42 @@ function simulationSetupMarkup() {
     )
     .join("");
 
-  simulationCountText("Escolha um formato e comece a resolver.");
+  simulationCountText("Escolha um formato e comece a treinar.");
 
   return `
     <div class="simulation-shell">
       <section class="simulation-launch-grid" aria-label="Formatos de simulado">
         <article class="simulation-launch-card">
           <div>
-            <h2>Simulado rapido</h2>
-            <p>10 questoes com distribuicao equilibrada entre as disciplinas.</p>
+            <h2>Simulado rápido · 10 questões</h2>
+            <p>10 questões com distribuição equilibrada entre as disciplinas.</p>
           </div>
-          <small>2 Portugues · 2 Matematica · 2 Ciencias · 2 Historia · 2 Geografia</small>
+          <small>2 Português · 2 Matemática · 2 Ciências Naturais · 2 História · 2 Geografia</small>
           <button class="tool-button" type="button" data-sim-start="rapido">Iniciar</button>
         </article>
 
         <article class="simulation-launch-card">
           <div>
-            <h2>Simulado medio</h2>
-            <p>20 questoes com o miolo mais recorrente do padrao recente do IFF.</p>
+            <h2>Simulado médio · 20 questões</h2>
+            <p>20 questões com o núcleo mais recorrente do padrão recente do IFF.</p>
           </div>
-          <small>5 Portugues · 5 Matematica · 5 Ciencias · Historia e Geografia alternadas</small>
+          <small>5 Português · 5 Matemática · 5 Ciências Naturais · História e Geografia alternadas</small>
           <button class="tool-button" type="button" data-sim-start="medio">Iniciar</button>
         </article>
 
         <article class="simulation-launch-card">
           <div>
-            <h2>Simulado completo</h2>
-            <p>40 questoes no formato mais proximo da prova inteira.</p>
+            <h2>Simulado completo · 40 questões</h2>
+            <p>40 questões no formato mais próximo da prova completa.</p>
           </div>
-          <small>10 Portugues · 10 Matematica · 10 Ciencias · 5 Historia · 5 Geografia</small>
+          <small>10 Português · 10 Matemática · 10 Ciências Naturais · 5 História · 5 Geografia</small>
           <button class="tool-button" type="button" data-sim-start="completo">Iniciar</button>
         </article>
 
         <article class="simulation-launch-card">
           <div>
-            <h2>Treino por disciplina</h2>
-            <p>10 questoes da disciplina escolhida, misturando prioridades alta, media e baixa.</p>
+            <h2>Treino por disciplina · 10 questões</h2>
+            <p>10 questões da disciplina escolhida, misturando prioridades alta, média e baixa.</p>
           </div>
           <label class="control">
             <span>Disciplina</span>
@@ -1256,8 +1311,8 @@ function simulationReviewSummary(question) {
   return `
     <div class="simulation-review-meta">
       <span class="pill ${statusClass}">${escapeHtml(statusLabel)}</span>
-      <span class="pill">Sua resposta ${escapeHtml(outcome.selected || "—")}</span>
-      <span class="pill is-answer">Correta ${escapeHtml(outcome.correct || "—")}</span>
+      <span class="pill">Sua resposta: ${escapeHtml(outcome.selected || "—")}</span>
+      <span class="pill is-answer">Resposta correta: ${escapeHtml(outcome.correct || "—")}</span>
       <span class="pill is-discipline">${escapeHtml(contentSummaryText(question))}</span>
     </div>
   `;
@@ -1270,7 +1325,7 @@ function simulationReviewListMarkup() {
   return `
     <section class="simulation-results-card">
       <header>
-        <h2>Revisao por questao</h2>
+        <h2>Revisão por questão</h2>
       </header>
       <div class="simulation-review-list">
         ${questions
@@ -1291,7 +1346,7 @@ function simulationReviewListMarkup() {
             return `
               <article class="simulation-review-item">
                 <div class="simulation-review-copy">
-                  <strong>Questao ${String(question.order).padStart(2, "0")} · ${escapeHtml(
+                  <strong>Questão ${String(question.order).padStart(2, "0")} · ${escapeHtml(
                     question.discipline,
                   )}</strong>
                   <p>${escapeHtml(contentSummaryText(question))}</p>
@@ -1321,7 +1376,7 @@ function simulationReviewListMarkup() {
 function simulationRunningMarkup(session) {
   const question = simulationCurrentQuestion();
   if (!question) {
-    return '<div class="empty-state">Nao foi possivel montar este simulado agora.</div>';
+    return '<div class="empty-state">Não foi possível montar este simulado agora.</div>';
   }
 
   const questions = simulationQuestions();
@@ -1340,7 +1395,7 @@ function simulationRunningMarkup(session) {
       <section class="simulation-banner">
         <div>
           <strong>${escapeHtml(simulationLabel(session))}</strong>
-          <p>Questao ${question.order} de ${questions.length} · ${answered} respondidas · ${unanswered} em aberto</p>
+          <p>Questão ${question.order} de ${questions.length} · ${answered} respondidas · ${unanswered} em aberto</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
@@ -1349,32 +1404,32 @@ function simulationRunningMarkup(session) {
         </div>
       </section>
 
-      <div class="simulation-stepper" aria-label="Navegacao entre questoes">
+      <div class="simulation-stepper" aria-label="Navegação entre questões">
         ${questions.map(simulationQuestionButton).join("")}
       </div>
 
       <article class="question-card simulation-question-card">
         <div class="question-top">
-          <span class="pill">Questao ${String(question.order).padStart(2, "0")}</span>
+          <span class="pill">Questão ${String(question.order).padStart(2, "0")}</span>
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
           <span class="pill">${escapeHtml(String(question.year))}</span>
         </div>
-        <h2 class="question-title">${escapeHtml(question.area || `Questao ${question.order}`)}</h2>
+        <h2 class="question-title">${escapeHtml(question.area || `Questão ${question.order}`)}</h2>
         ${supportTextMarkup(question)}
         ${questionImages(question)}
         ${referenceMarkup(question)}
         ${
           question.statement
             ? `<pre class="statement">${escapeHtml(question.statement)}</pre>`
-            : '<p class="empty-statement">Texto nao extraido automaticamente. Consulte o PDF da prova.</p>'
+            : '<p class="empty-statement">Texto não extraído automaticamente. Consulte o PDF da prova.</p>'
         }
         <div class="question-support-grid">
           <div class="question-support-card">
-            <strong>Conteudo</strong>
+            <strong>Conteúdo</strong>
             <span>${escapeHtml(contentSummaryText(question))}</span>
           </div>
         </div>
-        <div class="simulation-alternatives" role="group" aria-label="Alternativas da questao">
+        <div class="simulation-alternatives" role="group" aria-label="Alternativas da questão">
           ${question.alternatives.map((alternative) => simulationAlternativeMarkup(question, alternative)).join("")}
         </div>
       </article>
@@ -1386,13 +1441,13 @@ function simulationRunningMarkup(session) {
           }>Anterior</button>
           <button class="mini-button is-light" type="button" data-sim-nav="next" ${
             isLast ? "disabled" : ""
-          }>Proxima</button>
+          }>Próxima</button>
         </div>
         <div class="simulation-footer-status">
           ${
             selectedAnswer
               ? `Resposta marcada: <strong>${escapeHtml(selectedAnswer)}</strong>`
-              : "Nenhuma resposta marcada nesta questao."
+              : "Nenhuma resposta marcada nesta questão."
           }
         </div>
         <button class="tool-button" type="button" data-sim-finish="true">Finalizar simulado</button>
@@ -1498,21 +1553,21 @@ function simulationBreakdownMarkup(items, kind) {
 function simulationPerformanceBand(percent) {
   if (percent > 80) {
     return {
-      title: "Otimo desempenho",
-      text: "Voce aproveitou muito bem este simulado. Agora vale manter o ritmo e lapidar os detalhes.",
+      title: "Ótimo desempenho!",
+      text: "Você foi muito bem neste simulado. Continue praticando para manter o ritmo e ganhar ainda mais segurança.",
       tone: "is-good",
     };
   }
   if (percent >= 50) {
     return {
-      title: "Bom desempenho, mas vale revisar alguns pontos",
-      text: "Voce ja construiu uma base boa. O ganho agora vem de revisar os conteudos em que mais tropeçou.",
+      title: "Bom desempenho, com espaço para crescer",
+      text: "Você já construiu uma base consistente. Agora, revisar os conteúdos com mais erros pode transformar mais questões em acerto.",
       tone: "is-warning",
     };
   }
   return {
-    title: "Voce precisa reforcar os conteudos basicos",
-    text: "Este resultado pede uma retomada mais guiada. Priorize os conteudos com mais erros antes do proximo simulado.",
+    title: "Hora de reforçar a base",
+    text: "Este resultado mostra que vale retomar os conteúdos essenciais com calma. Revise os pontos com mais erros e depois tente novamente.",
     tone: "is-alert",
   };
 }
@@ -1537,8 +1592,8 @@ function simulationFeedbackData(result) {
     weakContents,
     strongContents,
     reviewMessage: weakContents.length
-      ? `Voce precisa revisar: ${weakContents.map((item) => simulationInsightLabel(item)).join(", ")}.`
-      : "Voce sustentou bem todos os conteudos deste simulado.",
+      ? `Você pode avançar mais rápido se revisar agora: ${weakContents.map((item) => simulationInsightLabel(item)).join(", ")}.`
+      : "Parabéns: você teve bom controle dos conteúdos deste simulado.",
   };
 }
 
@@ -1546,8 +1601,8 @@ function simulationInsightListMarkup(items, tone, mode) {
   if (!items.length) {
     return `<p class="simulation-feedback-empty">${
       mode === "error"
-        ? "Nenhum conteudo concentrou erros neste simulado."
-        : "Ainda nao houve acerto suficiente para destacar um conteudo aqui."
+        ? "Você não concentrou erros em um conteúdo específico neste simulado."
+        : "Ainda não houve acertos suficientes para destacar um conteúdo aqui."
     }</p>`;
   }
 
@@ -1678,7 +1733,7 @@ function simulationResultMarkup(session) {
       <section class="simulation-banner">
         <div>
           <strong>${escapeHtml(simulationLabel(session))}</strong>
-          <p>Resultado final do aluno neste simulado.</p>
+          <p>Seu resultado está pronto. Veja seus acertos e escolha o que revisar agora.</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-answer">${result.correct} acertos</span>
@@ -1701,7 +1756,7 @@ function simulationResultMarkup(session) {
           <strong>${result.answered}/${result.total}</strong>
         </article>
         <article class="simulation-summary-card">
-          <small>Conteudos</small>
+          <small>Conteúdos</small>
           <strong>${result.byContent.length}</strong>
         </article>
       </section>
@@ -1709,14 +1764,14 @@ function simulationResultMarkup(session) {
       <div class="simulation-results-grid">
         <section class="simulation-results-card">
           <header>
-            <h2>Acertos por disciplina</h2>
+            <h2>Seu desempenho por disciplina</h2>
           </header>
           ${simulationBreakdownMarkup(result.byDiscipline, "discipline")}
         </section>
 
         <section class="simulation-results-card">
           <header>
-            <h2>Acertos por conteudo</h2>
+            <h2>Seu desempenho por conteúdo</h2>
           </header>
           ${simulationBreakdownMarkup(result.byContent, "content")}
         </section>
@@ -1733,7 +1788,7 @@ function simulationResultMarkup(session) {
 function simulationRunningMarkupEnhanced(session) {
   const question = simulationCurrentQuestion();
   if (!question) {
-    return '<div class="empty-state">Nao foi possivel montar este simulado agora.</div>';
+    return '<div class="empty-state">Não foi possível montar este simulado agora.</div>';
   }
 
   const questions = simulationQuestions();
@@ -1756,7 +1811,7 @@ function simulationRunningMarkupEnhanced(session) {
 
   simulationCountText(
     isReview
-      ? `${simulationLabel(session)} - revisao de ${questions.length} questoes`
+      ? `${simulationLabel(session)} - revisão de ${questions.length} questões`
       : `${simulationLabel(session)} - ${answered}/${questions.length} respondidas`,
   );
 
@@ -1767,21 +1822,21 @@ function simulationRunningMarkupEnhanced(session) {
           <strong>${escapeHtml(simulationLabel(session))}</strong>
           <p>${
             isReview
-              ? `Revisao da questao ${question.order} de ${questions.length} - ${answered} respondidas - ${unanswered} em aberto`
-              : `Questao ${question.order} de ${questions.length} - ${answered} respondidas - ${unanswered} em aberto`
+              ? `Revisão da questão ${question.order} de ${questions.length} - ${answered} respondidas - ${unanswered} em aberto`
+              : `Questão ${question.order} de ${questions.length} - ${answered} respondidas - ${unanswered} em aberto`
           }</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
           <span class="pill">${escapeHtml(String(question.year))}</span>
           <span class="pill">${escapeHtml(session.data?.type === "treino-por-disciplina" ? "Treino" : "Simulado")}</span>
-          ${isReview ? '<span class="pill is-answer">Modo revisao</span>' : ""}
+          ${isReview ? '<span class="pill is-answer">Modo revisão</span>' : ""}
         </div>
       </section>
 
       <section class="simulation-progress-grid" aria-label="Resumo do andamento">
         <article class="simulation-progress-card">
-          <small>Questao atual</small>
+          <small>Questão atual</small>
           <strong>${escapeHtml(currentLabel)}</strong>
           <div class="simulation-progress-bar" aria-hidden="true">
             <span style="width: ${positionPercent}%"></span>
@@ -1795,7 +1850,7 @@ function simulationRunningMarkupEnhanced(session) {
           <div class="simulation-progress-bar is-answer" aria-hidden="true">
             <span style="width: ${progressPercent}%"></span>
           </div>
-          <p>${progressPercent}% concluido</p>
+          <p>${progressPercent}% concluído</p>
         </article>
 
         <article class="simulation-progress-card">
@@ -1803,8 +1858,8 @@ function simulationRunningMarkupEnhanced(session) {
           <strong>${unanswered}</strong>
           <p>${
             unanswered
-              ? "Use a navegacao para fechar as pendencias antes de finalizar."
-              : "Tudo respondido. Agora vale uma revisao calma."
+              ? "Use a navegação para fechar as pendências antes de finalizar."
+              : "Tudo respondido. Agora vale uma revisão calma."
           }</p>
           ${
             !isReview
@@ -1815,7 +1870,7 @@ function simulationRunningMarkupEnhanced(session) {
                   data-sim-next-open="${nextUnansweredIndex}"
                   ${nextUnansweredIndex < 0 ? "disabled" : ""}
                 >
-                  Proxima em aberto
+                  Próxima em aberto
                 </button>
               `
               : `
@@ -1827,17 +1882,17 @@ function simulationRunningMarkupEnhanced(session) {
         </article>
       </section>
 
-      <div class="simulation-stepper" aria-label="Navegacao entre questoes">
+      <div class="simulation-stepper" aria-label="Navegação entre questões">
         ${questions.map(simulationQuestionButton).join("")}
       </div>
 
       <article class="question-card simulation-question-card">
         <div class="question-top">
-          <span class="pill">Questao ${String(question.order).padStart(2, "0")}</span>
+          <span class="pill">Questão ${String(question.order).padStart(2, "0")}</span>
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
           <span class="pill">${escapeHtml(String(question.year))}</span>
         </div>
-        <h2 class="question-title">${escapeHtml(question.area || `Questao ${question.order}`)}</h2>
+        <h2 class="question-title">${escapeHtml(question.area || `Questão ${question.order}`)}</h2>
         ${isReview ? simulationReviewSummary(question) : ""}
         ${supportTextMarkup(question)}
         ${questionImages(question)}
@@ -1845,11 +1900,11 @@ function simulationRunningMarkupEnhanced(session) {
         ${
           question.statement
             ? `<pre class="statement">${escapeHtml(question.statement)}</pre>`
-            : '<p class="empty-statement">Texto nao extraido automaticamente. Consulte o PDF da prova.</p>'
+            : '<p class="empty-statement">Texto não extraído automaticamente. Consulte o PDF da prova.</p>'
         }
         <div class="question-support-grid">
           <div class="question-support-card">
-            <strong>Conteudo</strong>
+            <strong>Conteúdo</strong>
             <span>${escapeHtml(contentSummaryText(question))}</span>
           </div>
           ${
@@ -1867,7 +1922,7 @@ function simulationRunningMarkupEnhanced(session) {
               : ""
           }
         </div>
-        <div class="simulation-alternatives" role="group" aria-label="Alternativas da questao">
+        <div class="simulation-alternatives" role="group" aria-label="Alternativas da questão">
           ${question.alternatives.map((alternative) => simulationAlternativeMarkup(question, alternative)).join("")}
         </div>
       </article>
@@ -1879,7 +1934,7 @@ function simulationRunningMarkupEnhanced(session) {
           }>Anterior</button>
           <button class="mini-button is-light" type="button" data-sim-nav="next" ${
             isLast ? "disabled" : ""
-          }>Proxima</button>
+          }>Próxima</button>
         </div>
         <div class="simulation-footer-status">
           ${
@@ -1889,7 +1944,7 @@ function simulationRunningMarkupEnhanced(session) {
                 )}</strong>`
               : selectedAnswer
                 ? `Resposta marcada: <strong>${escapeHtml(selectedAnswer)}</strong>`
-                : "Nenhuma resposta marcada nesta questao."
+                : "Nenhuma resposta marcada nesta questão."
           }
         </div>
         ${
@@ -1914,7 +1969,7 @@ function simulationResultMarkupEnhanced(session) {
       <section class="simulation-banner">
         <div>
           <strong>${escapeHtml(simulationLabel(session))}</strong>
-          <p>Resultado final do aluno neste simulado.</p>
+          <p>Confira seu desempenho e escolha os próximos passos de estudo.</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-answer">${result.correct} acertos</span>
@@ -1937,12 +1992,12 @@ function simulationResultMarkupEnhanced(session) {
           <strong>${result.answered}/${result.total}</strong>
         </article>
         <article class="simulation-summary-card">
-          <small>Conteudos</small>
+          <small>Conteúdos</small>
           <strong>${result.byContent.length}</strong>
         </article>
       </section>
 
-      <section class="simulation-feedback-grid" aria-label="Leitura pedagogica do resultado">
+      <section class="simulation-feedback-grid" aria-label="Leitura pedagógica do resultado">
         <article class="simulation-feedback-card ${feedback.band.tone}">
           <header>
             <h2>${escapeHtml(feedback.band.title)}</h2>
@@ -1953,14 +2008,14 @@ function simulationResultMarkupEnhanced(session) {
 
         <article class="simulation-feedback-card is-alert">
           <header>
-            <h2>Conteudos com mais erros</h2>
+            <h2>Conteúdos para revisar agora</h2>
           </header>
           ${simulationInsightListMarkup(feedback.weakContents, "is-alert", "error")}
         </article>
 
         <article class="simulation-feedback-card is-good">
           <header>
-            <h2>Conteudos com mais acertos</h2>
+            <h2>Seus pontos fortes</h2>
           </header>
           ${simulationInsightListMarkup(feedback.strongContents, "is-good", "success")}
         </article>
@@ -1976,7 +2031,7 @@ function simulationResultMarkupEnhanced(session) {
 
         <section class="simulation-results-card">
           <header>
-            <h2>Acertos por conteudo</h2>
+            <h2>Acertos por conteúdo</h2>
           </header>
           ${simulationBreakdownMarkup(result.byContent, "content")}
         </section>
@@ -2026,7 +2081,7 @@ function startSimulation(mode, discipline = "") {
     if (mode === "completo") data = state.simulados.gerarSimuladoCompleto();
     if (mode === "treino") data = state.simulados.gerarTreinoPorDisciplina(discipline);
 
-    if (!data) throw new Error("Nao foi possivel gerar o simulado.");
+    if (!data) throw new Error("Não foi possível gerar o simulado.");
 
     state.simuladoSession = {
       stage: "running",
@@ -2048,7 +2103,8 @@ function startSimulation(mode, discipline = "") {
     renderSimulation();
   } catch (error) {
     console.error(error);
-    toast(error?.message || "Nao foi possivel iniciar este simulado.");
+    throw error;
+    toast(error?.message || "Não foi possível iniciar este simulado.");
   }
 }
 
@@ -2073,7 +2129,7 @@ function finishSimulation() {
   const unanswered = simulationUnansweredCount();
   if (unanswered > 0) {
     const shouldFinish = window.confirm(
-      `Ainda faltam ${unanswered} questao(oes) sem resposta. Deseja finalizar mesmo assim?`,
+      `Ainda faltam ${countLabel(unanswered, "questão", "questões")} sem resposta. Deseja finalizar mesmo assim?`,
     );
     if (!shouldFinish) return;
   }
@@ -2085,7 +2141,7 @@ function finishSimulation() {
 function retrySimulationFromErrors() {
   const data = buildRetrySimulationFromErrors();
   if (!data) {
-    toast("Nao ha conteudos com erro suficientes para montar um reforco agora.");
+    toast("Não há conteúdos com erro suficientes para montar um reforço agora.");
     return;
   }
 
@@ -2173,19 +2229,19 @@ function renderAll() {
 
 function exposeSimulationApi() {
   window.gerarSimuladoRapido = () => {
-    if (!state.simulados) throw new Error("Catalogo ainda nao carregado.");
+    if (!state.simulados) throw new Error("Catálogo ainda não carregado.");
     return state.simulados.gerarSimuladoRapido();
   };
   window.gerarSimuladoMedio = () => {
-    if (!state.simulados) throw new Error("Catalogo ainda nao carregado.");
+    if (!state.simulados) throw new Error("Catálogo ainda não carregado.");
     return state.simulados.gerarSimuladoMedio();
   };
   window.gerarSimuladoCompleto = () => {
-    if (!state.simulados) throw new Error("Catalogo ainda nao carregado.");
+    if (!state.simulados) throw new Error("Catálogo ainda não carregado.");
     return state.simulados.gerarSimuladoCompleto();
   };
   window.gerarTreinoPorDisciplina = (disciplina) => {
-    if (!state.simulados) throw new Error("Catalogo ainda nao carregado.");
+    if (!state.simulados) throw new Error("Catálogo ainda não carregado.");
     return state.simulados.gerarTreinoPorDisciplina(disciplina);
   };
 }
@@ -2372,7 +2428,39 @@ function bindEvents() {
   });
 }
 
-async function init() {
+function bindAccessGate() {
+  const form = $("#accessForm");
+  const input = $("#accessPasswordInput");
+  if (!form || !input) return;
+
+  input.addEventListener("input", () => setAccessError(""));
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const password = input.value.trim();
+
+    if (password !== ACCESS_PASSWORD) {
+      setAccessError("Senha incorreta. Tente novamente.");
+      input.focus();
+      input.select();
+      return;
+    }
+
+    setAccessError("");
+    setAccessLoading(true);
+    writeStoredAccess(true);
+    applyAccessState(true);
+
+    try {
+      await ensureApplicationLoaded();
+      input.value = "";
+    } finally {
+      setAccessLoading(false);
+    }
+  });
+}
+
+async function bootApplication() {
   try {
     const catalogResponse = await fetch(`data/catalog.json?v=${encodeURIComponent(ASSET_VERSION)}`, {
       cache: "no-store",
@@ -2424,6 +2512,7 @@ async function init() {
         ? hashView
         : "questoes",
     );
+    state.access.bootstrapped = true;
   } catch (error) {
     $("#questionList").innerHTML = `
       <div class="empty-state">
@@ -2432,6 +2521,36 @@ async function init() {
     `;
     console.error(error);
   }
+}
+
+function ensureApplicationLoaded() {
+  if (state.access.bootstrapped) {
+    return Promise.resolve();
+  }
+  if (state.access.bootPromise) {
+    return state.access.bootPromise;
+  }
+  state.access.bootPromise = bootApplication().finally(() => {
+    state.access.bootPromise = null;
+  });
+  return state.access.bootPromise;
+}
+
+async function init() {
+  bindAccessGate();
+  setAccessLoading(false);
+
+  if (readStoredAccess()) {
+    applyAccessState(true);
+    try {
+      await ensureApplicationLoaded();
+    } catch (_error) {
+      // Keep the shell visible so the existing error state remains visible.
+    }
+    return;
+  }
+
+  applyAccessState(false);
 }
 
 init();
