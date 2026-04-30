@@ -161,6 +161,10 @@ function questionPool() {
   return state.catalog?.questoesValidas || state.catalog?.questions || [];
 }
 
+function simulationPool() {
+  return state.catalog?.questoesSimuladoValidas || [];
+}
+
 function contentPool() {
   return state.catalog?.conteudosValidos || state.catalog?.contentSummaries || [];
 }
@@ -183,7 +187,7 @@ function formatPercent(value) {
 
 function availableSimulationDisciplines() {
   return disciplineOrder.filter((discipline) =>
-    questionPool().some((question) => question.discipline === discipline),
+    simulationPool().some((question) => question.discipline === discipline),
   );
 }
 
@@ -267,7 +271,7 @@ function normalizeContentSummary(value, discipline = "") {
   if (discipline === "Ciências Naturais") return "Ciências da natureza";
   if (discipline === "História") return "Contexto histórico";
   if (discipline === "Geografia") return "Espaço geográfico";
-  return "Conteúdo em revisão";
+  return "Assunto em revisão";
 }
 
 function contentKey(discipline, label) {
@@ -418,6 +422,13 @@ function normalizeQuestion(rawQuestion) {
               : [],
           }
         : { needed: false, reasons: [] },
+    elegivelSimulado:
+      typeof rawQuestion.elegivelSimulado === "boolean"
+        ? rawQuestion.elegivelSimulado
+        : String(rawQuestion.status || "").trim() === "completa",
+    motivosInelegibilidadeSimulado: Array.isArray(rawQuestion.motivosInelegibilidadeSimulado)
+      ? rawQuestion.motivosInelegibilidadeSimulado.map((item) => String(item).trim()).filter(Boolean)
+      : [],
     page: rawQuestion.page ?? null,
     sourcePdf: rawQuestion.sourcePdf || null,
     answerPdf: rawQuestion.answerPdf || null,
@@ -447,7 +458,7 @@ function contentSummaryText(question) {
 function contentFilterChip(question) {
   const label = contentSummary(question);
   if (!label) {
-    return '<p class="question-support is-missing">Conteúdo não classificado para esta questão.</p>';
+    return '<p class="question-support is-missing">Assunto não identificado nesta questão.</p>';
   }
   return `
     <div class="descriptor-chips">
@@ -605,10 +616,10 @@ function updateStats() {
   const top = [...contentPool()].sort((a, b) => b.count - a.count).slice(0, 2);
   $("#focusStrip").innerHTML = top.length
     ? `
-      <strong>Conteúdos mais recorrentes</strong>
+      <strong>Assuntos que mais aparecem</strong>
       ${top.map((item) => `<span>${escapeHtml(item.discipline)}: ${escapeHtml(item.label)}</span>`).join("")}
     `
-    : "<strong>Catálogo carregado</strong><span>Use os filtros para estudar por conteúdo.</span>";
+    : "<strong>Tudo pronto</strong><span>Use os filtros para estudar por assunto.</span>";
 }
 
 function answerPill(question) {
@@ -808,7 +819,7 @@ function questionCard(question) {
           <span>${escapeHtml(question.answer || "Sem gabarito oficial")}</span>
         </div>
         <div class="question-support-card">
-          <strong>Conteúdo</strong>
+          <strong>Assunto</strong>
           <span>${escapeHtml(contentSummaryText(question))}</span>
         </div>
       </div>
@@ -856,8 +867,8 @@ function renderQuestions() {
                   prioritizedCount,
                   "questão",
                   "questões",
-                )} são as que você errou ou deixou em branco no último simulado desse conteúdo.`
-              : "Aqui estão as questões desse conteúdo para você continuar estudando."
+                )} são as que você errou ou deixou em branco no último simulado desse assunto.`
+              : "Aqui estão as questões desse assunto para você continuar estudando."
           }</span>
         `
         : "";
@@ -995,8 +1006,8 @@ function descriptorCard(item, showDiscipline = false) {
   const disciplineText = showDiscipline ? "" : `<p>${escapeHtml(item.discipline)}</p>`;
   const summaryText =
     item.count === 1
-      ? "Conteúdo identificado em 1 questão válida."
-      : `Conteúdo identificado em ${item.count} questões válidas.`;
+      ? "Assunto encontrado em 1 questão válida."
+      : `Assunto encontrado em ${item.count} questões válidas.`;
   return `
     <article class="descriptor-card">
       <header>
@@ -1068,7 +1079,7 @@ function renderDescriptorToolbar(descriptors) {
       shortcuts.length
         ? `
           <div class="descriptor-shortcuts">
-            <strong>Foco agora · ${escapeHtml(selectedLabel)}</strong>
+            <strong>Vale revisar agora · ${escapeHtml(selectedLabel)}</strong>
             <div class="descriptor-shortcut-list">
               ${shortcuts
                 .map(
@@ -1100,14 +1111,14 @@ function renderDescriptors() {
   const descriptors = sortDescriptorsByPriority(contentPool().filter(descriptorMatches));
   const selectedLabel =
     state.filters.discipline === "all" ? "" : ` em ${state.filters.discipline}`;
-  $("#descriptorCount").textContent = `${descriptors.length} conteúdo${
+  $("#descriptorCount").textContent = `${descriptors.length} assunto${
     descriptors.length === 1 ? "" : "s"
-  }${selectedLabel} · ordem por prioridade de estudo`;
+  }${selectedLabel} · veja o que mais vale revisar`;
   renderDescriptorToolbar(descriptors);
 
   if (!descriptors.length) {
     $("#descriptorList").innerHTML =
-      '<div class="empty-state">Nenhum conteúdo encontrado com os filtros atuais.</div>';
+      '<div class="empty-state">Nenhum assunto encontrado com os filtros atuais.</div>';
     return;
   }
 
@@ -1131,7 +1142,7 @@ function renderDescriptors() {
           <header class="descriptor-group-head">
             <div>
               <h2>${escapeHtml(group.discipline)}</h2>
-              <p>${group.items.length} conteúdo${
+              <p>${group.items.length} assunto${
                 group.items.length === 1 ? "" : "s"
               } · ${totalQuestions} incidência${totalQuestions === 1 ? "" : "s"}</p>
             </div>
@@ -1245,7 +1256,7 @@ function simulationSetupMarkup() {
     )
     .join("");
 
-  simulationCountText("Escolha um formato e comece a treinar.");
+  simulationCountText("Escolha um formato e treine no estilo da prova do IFF.");
 
   return `
     <div class="simulation-shell">
@@ -1262,7 +1273,7 @@ function simulationSetupMarkup() {
         <article class="simulation-launch-card">
           <div>
             <h2>Simulado médio · 20 questões</h2>
-            <p>20 questões com o núcleo mais recorrente do padrão recente do IFF.</p>
+            <p>20 questões no estilo mais comum da prova do IFF.</p>
           </div>
           <small>5 Português · 5 Matemática · 5 Ciências Naturais · História e Geografia alternadas</small>
           <button class="tool-button" type="button" data-sim-start="medio">Iniciar</button>
@@ -1280,7 +1291,7 @@ function simulationSetupMarkup() {
         <article class="simulation-launch-card">
           <div>
             <h2>Treino por disciplina · 10 questões</h2>
-            <p>10 questões da disciplina escolhida, misturando prioridades alta, média e baixa.</p>
+            <p>10 questões da disciplina escolhida, misturando assuntos que mais caem e pontos de revisão.</p>
           </div>
           <label class="control">
             <span>Disciplina</span>
@@ -1425,7 +1436,7 @@ function simulationRunningMarkup(session) {
         }
         <div class="question-support-grid">
           <div class="question-support-card">
-            <strong>Conteúdo</strong>
+            <strong>Assunto</strong>
             <span>${escapeHtml(contentSummaryText(question))}</span>
           </div>
         </div>
@@ -1553,21 +1564,21 @@ function simulationBreakdownMarkup(items, kind) {
 function simulationPerformanceBand(percent) {
   if (percent > 80) {
     return {
-      title: "Ótimo desempenho!",
-      text: "Você foi muito bem neste simulado. Continue praticando para manter o ritmo e ganhar ainda mais segurança.",
+      title: "Ótimo ritmo de prova!",
+      text: "Você foi muito bem nesta tentativa. Continue treinando para chegar ainda mais seguro à prova do IFF.",
       tone: "is-good",
     };
   }
   if (percent >= 50) {
     return {
-      title: "Bom desempenho, com espaço para crescer",
-      text: "Você já construiu uma base consistente. Agora, revisar os conteúdos com mais erros pode transformar mais questões em acerto.",
+      title: "Bom caminho para a prova",
+      text: "Você já tem uma base boa. Agora vale revisar os assuntos em que mais errou para transformar mais questões em acerto.",
       tone: "is-warning",
     };
   }
   return {
     title: "Hora de reforçar a base",
-    text: "Este resultado mostra que vale retomar os conteúdos essenciais com calma. Revise os pontos com mais erros e depois tente novamente.",
+    text: "Este resultado mostra que vale retomar os assuntos essenciais com calma. Revise os pontos com mais erros e depois tente novamente.",
     tone: "is-alert",
   };
 }
@@ -1592,8 +1603,8 @@ function simulationFeedbackData(result) {
     weakContents,
     strongContents,
     reviewMessage: weakContents.length
-      ? `Você pode avançar mais rápido se revisar agora: ${weakContents.map((item) => simulationInsightLabel(item)).join(", ")}.`
-      : "Parabéns: você teve bom controle dos conteúdos deste simulado.",
+      ? `Agora vale revisar: ${weakContents.map((item) => simulationInsightLabel(item)).join(", ")}.`
+      : "Você foi bem nos assuntos desta tentativa.",
   };
 }
 
@@ -1601,8 +1612,8 @@ function simulationInsightListMarkup(items, tone, mode) {
   if (!items.length) {
     return `<p class="simulation-feedback-empty">${
       mode === "error"
-        ? "Você não concentrou erros em um conteúdo específico neste simulado."
-        : "Ainda não houve acertos suficientes para destacar um conteúdo aqui."
+        ? "Seus erros ficaram bem distribuídos neste simulado."
+        : "Ainda é cedo para destacar um ponto forte nesta tentativa."
     }</p>`;
   }
 
@@ -1700,7 +1711,7 @@ function buildRetrySimulationFromErrors() {
   const weakKeys = new Set(
     weakContents.map((item) => `${item.discipline}::${item.label}`),
   );
-  const validPool = state.catalog?.questoesValidas || [];
+  const validPool = simulationPool();
   const matchingPool = validPool.filter((question) =>
     weakKeys.has(`${question.discipline}::${contentSummaryText(question)}`),
   );
@@ -1733,7 +1744,7 @@ function simulationResultMarkup(session) {
       <section class="simulation-banner">
         <div>
           <strong>${escapeHtml(simulationLabel(session))}</strong>
-          <p>Seu resultado está pronto. Veja seus acertos e escolha o que revisar agora.</p>
+          <p>Seu resultado está pronto. Veja onde você foi bem e o que vale revisar agora.</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-answer">${result.correct} acertos</span>
@@ -1756,7 +1767,7 @@ function simulationResultMarkup(session) {
           <strong>${result.answered}/${result.total}</strong>
         </article>
         <article class="simulation-summary-card">
-          <small>Conteúdos</small>
+          <small>Assuntos</small>
           <strong>${result.byContent.length}</strong>
         </article>
       </section>
@@ -1771,7 +1782,7 @@ function simulationResultMarkup(session) {
 
         <section class="simulation-results-card">
           <header>
-            <h2>Seu desempenho por conteúdo</h2>
+            <h2>Seu desempenho por assunto</h2>
           </header>
           ${simulationBreakdownMarkup(result.byContent, "content")}
         </section>
@@ -1904,7 +1915,7 @@ function simulationRunningMarkupEnhanced(session) {
         }
         <div class="question-support-grid">
           <div class="question-support-card">
-            <strong>Conteúdo</strong>
+            <strong>Assunto</strong>
             <span>${escapeHtml(contentSummaryText(question))}</span>
           </div>
           ${
@@ -1969,7 +1980,7 @@ function simulationResultMarkupEnhanced(session) {
       <section class="simulation-banner">
         <div>
           <strong>${escapeHtml(simulationLabel(session))}</strong>
-          <p>Confira seu desempenho e escolha os próximos passos de estudo.</p>
+          <p>Confira seu resultado e escolha o próximo passo para chegar mais forte à prova do IFF.</p>
         </div>
         <div class="simulation-banner-meta">
           <span class="pill is-answer">${result.correct} acertos</span>
@@ -1992,12 +2003,12 @@ function simulationResultMarkupEnhanced(session) {
           <strong>${result.answered}/${result.total}</strong>
         </article>
         <article class="simulation-summary-card">
-          <small>Conteúdos</small>
+          <small>Assuntos</small>
           <strong>${result.byContent.length}</strong>
         </article>
       </section>
 
-      <section class="simulation-feedback-grid" aria-label="Leitura pedagógica do resultado">
+      <section class="simulation-feedback-grid" aria-label="O que seu resultado mostra">
         <article class="simulation-feedback-card ${feedback.band.tone}">
           <header>
             <h2>${escapeHtml(feedback.band.title)}</h2>
@@ -2008,7 +2019,7 @@ function simulationResultMarkupEnhanced(session) {
 
         <article class="simulation-feedback-card is-alert">
           <header>
-            <h2>Conteúdos para revisar agora</h2>
+            <h2>Assuntos para revisar agora</h2>
           </header>
           ${simulationInsightListMarkup(feedback.weakContents, "is-alert", "error")}
         </article>
@@ -2024,14 +2035,14 @@ function simulationResultMarkupEnhanced(session) {
       <div class="simulation-results-grid">
         <section class="simulation-results-card">
           <header>
-            <h2>Acertos por disciplina</h2>
+            <h2>Seu resultado por disciplina</h2>
           </header>
           ${simulationBreakdownMarkup(result.byDiscipline, "discipline")}
         </section>
 
         <section class="simulation-results-card">
           <header>
-            <h2>Acertos por conteúdo</h2>
+            <h2>Seu resultado por assunto</h2>
           </header>
           ${simulationBreakdownMarkup(result.byContent, "content")}
         </section>
@@ -2141,7 +2152,7 @@ function finishSimulation() {
 function retrySimulationFromErrors() {
   const data = buildRetrySimulationFromErrors();
   if (!data) {
-    toast("Não há conteúdos com erro suficientes para montar um reforço agora.");
+    toast("Ainda não há assuntos com erro suficientes para montar um reforço agora.");
     return;
   }
 
@@ -2470,7 +2481,10 @@ async function bootApplication() {
     state.catalog.questoesValidas = state.catalog.questions.filter(
       (question) => question.status === "completa",
     );
-    state.simulados = createSimuladoApi(state.catalog.questoesValidas);
+    state.catalog.questoesSimuladoValidas = state.catalog.questoesValidas.filter(
+      (question) => question.elegivelSimulado !== false,
+    );
+    state.simulados = createSimuladoApi(state.catalog.questoesSimuladoValidas);
     exposeSimulationApi();
     state.catalog.contentSummaries = buildContentPool(state.catalog.questions);
     state.catalog.conteudosValidos = buildContentPool(state.catalog.questoesValidas);

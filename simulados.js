@@ -79,7 +79,9 @@ function shuffle(items) {
 }
 
 function ensureCompleteQuestions(questions) {
-  return (questions || []).filter((question) => question?.status === "completa");
+  return (questions || []).filter(
+    (question) => question?.status === "completa" && question?.elegivelSimulado !== false,
+  );
 }
 
 function buildQuestionView(question) {

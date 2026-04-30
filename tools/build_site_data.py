@@ -320,6 +320,26 @@ SUPPORT_TYPE_RULES = [
     ("texto", [r"\btexto\s+[ivxlcdm]+\b", r"\bfragmento\b", r"\bleia o texto\b"]),
 ]
 
+SIMULATION_TEXT_REFERENCE_PATTERNS = [
+    r"\btexto anterior\b",
+    r"\bquestao anterior\b",
+    r"\bquestoes anteriores\b",
+]
+
+SIMULATION_TEXT_SUPPORT_PATTERNS = [
+    r"\btexto\s+i\b",
+    r"\btexto\s+ii\b",
+]
+
+SIMULATION_VISUAL_SUPPORT_PATTERNS = [
+    r"\bfigura abaixo\b",
+    r"\bimagem abaixo\b",
+    r"\bmapa abaixo\b",
+    r"\bgrafico abaixo\b",
+    r"\btabela abaixo\b",
+    r"\btirinha\b",
+]
+
 STARTER_RESOLUTIONS = {
     "2025-01": {
         "status": "publicada",
@@ -913,6 +933,83 @@ def manual_review_reasons(question: dict[str, object]) -> list[str]:
 
 def matches_any_rule(text: str, patterns: list[str]) -> bool:
     return any(re.search(pattern, text) for pattern in patterns)
+
+
+def simulation_alternatives_are_legible(alternatives: list[dict[str, str]]) -> bool:
+    letters = [
+        str(alternative.get("letter") or "").strip().upper()
+        for alternative in alternatives
+    ]
+    if len(alternatives) != 5 or letters != EXPECTED_ALTERNATIVE_LETTERS:
+        return False
+
+    for alternative in alternatives:
+        text = str(alternative.get("text") or "").strip()
+        if not text:
+            return False
+        if contains_bleed_marker(text) or contains_reference_marker(text):
+            return False
+    return True
+
+
+def simulation_eligibility_reasons(question: dict[str, object]) -> list[str]:
+    reasons: list[str] = []
+    statement = str(question.get("statement") or "").strip()
+    support_text = str(question.get("textoApoio") or "").strip()
+    normalized_statement = normalize_search_text(statement)
+    alternatives = [
+        alternative
+        for alternative in (question.get("alternatives") or [])
+        if isinstance(alternative, dict)
+    ]
+    answer = str(question.get("answer") or "").strip().upper()
+    status = str(question.get("status") or "").strip()
+    support_images = question.get("imagemApoio") or question.get("images") or []
+    has_support_image = bool(support_images)
+    has_support_text = bool(support_text)
+    manual_review = question.get("manualReview") or {}
+    manual_review_reasons_list = (
+        [str(item) for item in manual_review.get("reasons", [])]
+        if isinstance(manual_review, dict)
+        else []
+    )
+
+    if status != "completa":
+        reasons.append("status_diferente_de_completa")
+    if not statement:
+        reasons.append("enunciado_incompleto")
+    if matches_any_rule(normalized_statement, SIMULATION_TEXT_REFERENCE_PATTERNS):
+        reasons.append("depende_de_conteudo_anterior")
+    if (
+        matches_any_rule(normalized_statement, SIMULATION_TEXT_SUPPORT_PATTERNS)
+        and not (has_support_text or has_support_image)
+    ):
+        reasons.append("texto_de_apoio_ausente")
+    if (
+        matches_any_rule(normalized_statement, SIMULATION_VISUAL_SUPPORT_PATTERNS)
+        and not has_support_image
+    ):
+        reasons.append("imagem_de_apoio_ausente")
+    if not simulation_alternatives_are_legible(alternatives):
+        reasons.append("alternativas_incompletas_ou_ilegiveis")
+    if answer not in EXPECTED_ALTERNATIVE_LETTERS:
+        reasons.append("gabarito_invalido")
+    if "enunciado_com_ruido" in manual_review_reasons_list:
+        reasons.append("enunciado_com_ruido")
+    if "apoio_com_fonte_misturada" in manual_review_reasons_list:
+        reasons.append("apoio_com_referencia_misturada")
+    if "alternativa_com_texto_estranho" in manual_review_reasons_list:
+        reasons.append("alternativas_incompletas_ou_ilegiveis")
+    if "alternativas_nao_extraidas" in manual_review_reasons_list:
+        reasons.append("alternativas_incompletas_ou_ilegiveis")
+    if "expressao_complexa_para_latex" in manual_review_reasons_list:
+        reasons.append("expressao_matematica_ilegivel")
+
+    unique_reasons: list[str] = []
+    for reason in reasons:
+        if reason not in unique_reasons:
+            unique_reasons.append(reason)
+    return unique_reasons
 
 
 def infer_math_content_summary(text: str) -> str:
@@ -2063,6 +2160,8 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
                     "apoioTipos": [],
                     "resolution": normalized_resolution,
                     "status": status,
+                    "elegivelSimulado": False,
+                    "motivosInelegibilidadeSimulado": [],
                     "manualReview": {
                         "needed": False,
                         "reasons": [],
@@ -2103,8 +2202,16 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
         }
         if question.get("status") == "completa" and "alternativa_com_texto_estranho" in review_reasons:
             question["status"] = "revisar"
+        simulation_reasons = simulation_eligibility_reasons(question)
+        question["motivosInelegibilidadeSimulado"] = simulation_reasons
+        question["elegivelSimulado"] = not simulation_reasons
 
     valid_questions = [item for item in questions if item.get("status") == "completa"]
+    simulation_eligible_questions = [
+        item
+        for item in questions
+        if item.get("status") == "completa" and item.get("elegivelSimulado")
+    ]
     valid_by_discipline = {
         discipline: sum(1 for item in valid_questions if item.get("discipline") == discipline)
         for _, _, discipline, _ in DISCIPLINE_RANGES
@@ -2113,13 +2220,30 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
         year: sum(1 for item in valid_questions if int(item.get("year", 0)) == year)
         for year in sorted({int(item.get("year", 0)) for item in valid_questions})
     }
+    simulation_valid_by_discipline = {
+        discipline: sum(
+            1
+            for item in simulation_eligible_questions
+            if item.get("discipline") == discipline
+        )
+        for _, _, discipline, _ in DISCIPLINE_RANGES
+    }
+    simulation_valid_by_year = {
+        year: sum(
+            1
+            for item in simulation_eligible_questions
+            if int(item.get("year", 0)) == year
+        )
+        for year in sorted({int(item.get("year", 0)) for item in simulation_eligible_questions})
+    }
     simulado_blueprint = {
         discipline: {
-            "count": valid_by_discipline.get(discipline, 0),
+            "count": simulation_valid_by_discipline.get(discipline, 0),
             "needed": end - start + 1,
-            "canBuild": valid_by_discipline.get(discipline, 0) >= (end - start + 1),
+            "canBuild": simulation_valid_by_discipline.get(discipline, 0)
+            >= (end - start + 1),
             "coverage": (
-                valid_by_discipline.get(discipline, 0) // (end - start + 1)
+                simulation_valid_by_discipline.get(discipline, 0) // (end - start + 1)
                 if end - start + 1
                 else 0
             ),
@@ -2194,6 +2318,14 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
             "validQuestions": len(valid_questions),
             "validQuestionsByDiscipline": valid_by_discipline,
             "validQuestionsByYear": valid_by_year,
+            "simulationEligibleQuestions": len(simulation_eligible_questions),
+            "simulationEligibleByDiscipline": simulation_valid_by_discipline,
+            "simulationEligibleByYear": simulation_valid_by_year,
+            "simulationExcludedFromValidQuestions": sum(
+                1
+                for item in questions
+                if item.get("status") == "completa" and not item.get("elegivelSimulado")
+            ),
             "simuladoBlueprint": simulado_blueprint,
             "statusCounts": {
                 status: sum(1 for item in questions if item.get("status") == status)
