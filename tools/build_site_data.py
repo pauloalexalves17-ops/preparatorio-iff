@@ -28,6 +28,8 @@ DISCIPLINE_RANGES = [
     (36, 40, "Geografia", "Ciências Humanas"),
 ]
 
+DISCIPLINE_ORDER = [item[2] for item in DISCIPLINE_RANGES]
+
 SKIP_QUESTION_MARKERS = [
     "NOSSOS CAMPI",
     "Endereços dos campi",
@@ -397,6 +399,20 @@ def classify_source(name: str) -> str:
     return "prova"
 
 
+def target_pdf_name(src: Path) -> str:
+    year = year_from_name(src.name)
+    kind = classify_source(src.name)
+    if year:
+        if kind == "edital":
+            return f"{year}-edital.pdf"
+        if kind == "gabarito":
+            return f"{year}-gabarito.pdf"
+        if kind == "prova-gabarito":
+            return f"{year}-prova-gabarito.pdf"
+        return f"{year}-prova.pdf"
+    return f"{slugify(src.stem)}.pdf"
+
+
 def copy_pdf(src: Path) -> str:
     PDF_DIR.mkdir(parents=True, exist_ok=True)
     try:
@@ -404,9 +420,7 @@ def copy_pdf(src: Path) -> str:
             return src.relative_to(ROOT).as_posix()
     except Exception:
         pass
-    year = year_from_name(src.name)
-    prefix = f"{year}-" if year else ""
-    dst_name = f"{prefix}{slugify(src.stem)}.pdf"
+    dst_name = target_pdf_name(src)
     dst = PDF_DIR / dst_name
     if not dst.exists() or dst.stat().st_size != src.stat().st_size:
         shutil.copy2(src, dst)
@@ -428,6 +442,13 @@ def discipline_for_number(number: int) -> tuple[str, str]:
         if start <= number <= end:
             return discipline, area
     return "Geral", "Geral"
+
+
+def discipline_index(discipline: str) -> int:
+    try:
+        return DISCIPLINE_ORDER.index(discipline)
+    except ValueError:
+        return len(DISCIPLINE_ORDER)
 
 
 def clean_question_text(text: str) -> str:
@@ -952,11 +973,295 @@ def simulation_alternatives_are_legible(alternatives: list[dict[str, str]]) -> b
     return True
 
 
-def simulation_eligibility_reasons(question: dict[str, object]) -> list[str]:
+def extract_support_markers(*parts: object) -> set[str]:
+    normalized = normalize_search_text(*parts)
+    markers: set[str] = set()
+    if re.search(r"\btexto\s+i\b", normalized):
+        markers.add("texto_i")
+    if re.search(r"\btexto\s+ii\b", normalized):
+        markers.add("texto_ii")
+    if re.search(r"\btexto\s+iii\b", normalized):
+        markers.add("texto_iii")
+    if re.search(r"\btextos?\s+i\s+e\s+ii\b", normalized):
+        markers.update({"texto_i", "texto_ii"})
+    if re.search(r"\btextos?\s+ii\s+e\s+iii\b", normalized):
+        markers.update({"texto_ii", "texto_iii"})
+    if re.search(r"\btexto anterior\b", normalized):
+        markers.add("texto_anterior")
+    if re.search(r"\bquestao anterior\b|\bquestoes anteriores\b", normalized):
+        markers.add("questao_anterior")
+    if re.search(r"\bfigura abaixo\b|\bfigura ao lado\b", normalized):
+        markers.add("figura")
+    if re.search(r"\bimagem abaixo\b|\bimagem ao lado\b", normalized):
+        markers.add("imagem")
+    if re.search(r"\bmapa abaixo\b|\bmapa ao lado\b", normalized):
+        markers.add("mapa")
+    if re.search(r"\bgrafico abaixo\b|\bgrafico ao lado\b", normalized):
+        markers.add("grafico")
+    if re.search(r"\btabela abaixo\b|\btabela ao lado\b", normalized):
+        markers.add("tabela")
+    if re.search(r"\btirinha\b", normalized):
+        markers.add("tirinha")
+    return markers
+
+
+def extract_referenced_question_numbers(*parts: object) -> list[int]:
+    normalized = normalize_search_text(*parts)
+    numbers = [int(match) for match in re.findall(r"\bquestao\s+(\d+)\b", normalized)]
+    unique_numbers: list[int] = []
+    for number in numbers:
+        if number not in unique_numbers:
+            unique_numbers.append(number)
+    return unique_numbers
+
+
+def question_has_text_support(question: dict[str, object]) -> bool:
+    return bool(str(question.get("textoApoio") or "").strip())
+
+
+def question_has_image_support(question: dict[str, object]) -> bool:
+    return bool(question.get("imagemApoio") or question.get("images"))
+
+
+def question_support_signatures(question: dict[str, object]) -> list[str]:
+    signatures: list[str] = []
+    support_text = normalize_search_text(question.get("textoApoio") or "")
+    if support_text:
+        signatures.append(f"texto:{support_text[:220]}")
+    image_names = sorted(
+        Path(str(image.get("src") or "")).name
+        for image in (question.get("imagemApoio") or question.get("images") or [])
+        if str(image.get("src") or "").strip()
+    )
+    if image_names:
+        signatures.append(f"imagem:{'|'.join(image_names)}")
+    return signatures
+
+
+def question_primary_group_kind(question: dict[str, object], markers: set[str]) -> str:
+    if "tirinha" in markers:
+        return "tirinha"
+    if "grafico" in markers:
+        return "grafico"
+    if "tabela" in markers:
+        return "tabela"
+    if "mapa" in markers:
+        return "mapa"
+    if "figura" in markers:
+        return "figura"
+    if "imagem" in markers:
+        return "imagem"
+    if markers & {"texto_i", "texto_ii", "texto_iii", "texto_anterior", "questao_anterior"}:
+        return "texto"
+
+    support_types = [str(item) for item in question.get("apoioTipos") or []]
+    if "tirinha" in support_types:
+        return "tirinha"
+    if "gráfico" in support_types:
+        return "grafico"
+    if "tabela" in support_types:
+        return "tabela"
+    if "mapa" in support_types:
+        return "mapa"
+    if question_has_image_support(question):
+        return "imagem"
+    return "texto"
+
+
+def build_group_id(year: int, kind: str, anchor_number: int) -> str:
+    return f"{year}_1_{kind}_{anchor_number}"
+
+
+def dsu_find(parents: dict[str, str], item: str) -> str:
+    root = item
+    while parents[root] != root:
+        root = parents[root]
+    while parents[item] != item:
+        parent = parents[item]
+        parents[item] = root
+        item = parent
+    return root
+
+
+def dsu_union(parents: dict[str, str], left: str, right: str) -> None:
+    left_root = dsu_find(parents, left)
+    right_root = dsu_find(parents, right)
+    if left_root != right_root:
+        parents[right_root] = left_root
+
+
+def build_support_groups(
+    questions: list[dict[str, object]],
+) -> tuple[dict[str, dict[str, object]], dict[str, str]]:
+    ordered_questions = sorted(
+        questions,
+        key=lambda item: (
+            int(item.get("year", 0)),
+            str(item.get("sourcePdf") or ""),
+            discipline_index(str(item.get("discipline") or "")),
+            int(item.get("number", 0)),
+        ),
+    )
+    by_id = {str(question.get("id")): question for question in ordered_questions}
+    parents = {str(question.get("id")): str(question.get("id")) for question in ordered_questions}
+    markers_by_id = {
+        str(question.get("id")): extract_support_markers(
+            question.get("statement"),
+            question.get("textoApoio"),
+            " ".join(str(item) for item in question.get("fonteReferencia") or []),
+        )
+        for question in ordered_questions
+    }
+    signatures_by_id = {
+        str(question.get("id")): question_support_signatures(question)
+        for question in ordered_questions
+    }
+
+    context_number_to_id: dict[tuple[tuple[int, str, str], int], str] = {}
+    for question in ordered_questions:
+        context = (
+            int(question.get("year", 0)),
+            str(question.get("sourcePdf") or ""),
+            str(question.get("discipline") or ""),
+        )
+        context_number_to_id[(context, int(question.get("number", 0)))] = str(question.get("id"))
+
+    last_question_by_context: dict[tuple[int, str, str], str] = {}
+    marker_anchor_by_context: dict[tuple[tuple[int, str, str], str], str] = {}
+    signature_anchor_by_context: dict[tuple[tuple[int, str, str], str], str] = {}
+
+    for question in ordered_questions:
+        question_id = str(question.get("id"))
+        context = (
+            int(question.get("year", 0)),
+            str(question.get("sourcePdf") or ""),
+            str(question.get("discipline") or ""),
+        )
+        markers = markers_by_id[question_id]
+        has_text_support = question_has_text_support(question)
+        has_image_support = question_has_image_support(question)
+        has_visible_support = has_text_support or has_image_support
+        referenced_numbers = extract_referenced_question_numbers(
+            question.get("statement"),
+            question.get("textoApoio"),
+        )
+
+        for referenced_number in referenced_numbers:
+            referenced_id = context_number_to_id.get((context, referenced_number))
+            if referenced_id and referenced_id != question_id:
+                dsu_union(parents, question_id, referenced_id)
+
+        for marker in sorted(markers & {"texto_i", "texto_ii", "texto_iii"}):
+            anchor_id = marker_anchor_by_context.get((context, marker))
+            if anchor_id and anchor_id != question_id:
+                dsu_union(parents, question_id, anchor_id)
+
+        for signature in signatures_by_id[question_id]:
+            anchor_id = signature_anchor_by_context.get((context, signature))
+            if anchor_id and anchor_id != question_id:
+                dsu_union(parents, question_id, anchor_id)
+
+        previous_id = last_question_by_context.get(context)
+        previous_question = by_id.get(previous_id) if previous_id else None
+        previous_markers = markers_by_id.get(previous_id, set()) if previous_id else set()
+
+        if previous_question:
+            current_number = int(question.get("number", 0))
+            previous_number = int(previous_question.get("number", 0))
+            consecutive = current_number - previous_number == 1
+            if consecutive:
+                if (
+                    markers & {"texto_anterior", "questao_anterior"}
+                    and (
+                        question_has_text_support(previous_question)
+                        or question_has_image_support(previous_question)
+                    )
+                ):
+                    dsu_union(parents, question_id, previous_id)
+
+                shared_markers = markers & previous_markers & {"texto_i", "texto_ii", "texto_iii"}
+                if shared_markers:
+                    dsu_union(parents, question_id, previous_id)
+
+        if has_visible_support:
+            for marker in markers:
+                marker_anchor_by_context[(context, marker)] = question_id
+            for signature in signatures_by_id[question_id]:
+                signature_anchor_by_context[(context, signature)] = question_id
+
+        last_question_by_context[context] = question_id
+
+    grouped_ids: dict[str, list[str]] = {}
+    for question in ordered_questions:
+        question_id = str(question.get("id"))
+        root = dsu_find(parents, question_id)
+        grouped_ids.setdefault(root, []).append(question_id)
+
+    support_groups: dict[str, dict[str, object]] = {}
+    question_group_ids: dict[str, str] = {}
+    for members in grouped_ids.values():
+        if len(members) < 2:
+            continue
+        member_questions = sorted(
+            (by_id[member_id] for member_id in members),
+            key=lambda item: int(item.get("number", 0)),
+        )
+        support_members = [
+            item
+            for item in member_questions
+            if question_has_text_support(item) or question_has_image_support(item)
+        ]
+        marker_union: set[str] = set()
+        for member_id in members:
+            marker_union.update(markers_by_id.get(member_id, set()))
+        anchor_question = support_members[0] if support_members else member_questions[0]
+        group_kind = question_primary_group_kind(anchor_question, marker_union)
+        group_id = build_group_id(
+            int(anchor_question.get("year", 0)),
+            group_kind,
+            int(member_questions[0].get("number", 0)),
+        )
+        support_groups[group_id] = {
+            "id": group_id,
+            "year": int(anchor_question.get("year", 0)),
+            "discipline": str(anchor_question.get("discipline") or ""),
+            "kind": group_kind,
+            "questionIds": [str(item.get("id")) for item in member_questions],
+            "supportQuestionIds": [str(item.get("id")) for item in support_members],
+            "markers": sorted(marker_union),
+        }
+        for order, member in enumerate(member_questions, start=1):
+            question_group_ids[str(member.get("id"))] = group_id
+            member["grupoApoioId"] = group_id
+            member["ordemNoGrupo"] = order
+
+    return support_groups, question_group_ids
+
+
+def group_mode_availability(group_size: int, discipline: str) -> dict[str, bool]:
+    quick_limit = 2
+    medium_limit = 3 if discipline in {"História", "Geografia"} else 5
+    complete_limit = 5 if discipline in {"História", "Geografia"} else 10
+    return {
+        "rapido": group_size <= quick_limit,
+        "medio": group_size <= medium_limit,
+        "completo": group_size <= complete_limit,
+    }
+
+
+def simulation_eligibility_reasons(
+    question: dict[str, object],
+    support_groups: dict[str, dict[str, object]],
+    question_lookup: dict[str, dict[str, object]],
+) -> list[str]:
     reasons: list[str] = []
     statement = str(question.get("statement") or "").strip()
-    support_text = str(question.get("textoApoio") or "").strip()
     normalized_statement = normalize_search_text(statement)
+    markers = extract_support_markers(
+        question.get("statement"),
+        question.get("textoApoio"),
+        " ".join(str(item) for item in question.get("fonteReferencia") or []),
+    )
     alternatives = [
         alternative
         for alternative in (question.get("alternatives") or [])
@@ -964,9 +1269,6 @@ def simulation_eligibility_reasons(question: dict[str, object]) -> list[str]:
     ]
     answer = str(question.get("answer") or "").strip().upper()
     status = str(question.get("status") or "").strip()
-    support_images = question.get("imagemApoio") or question.get("images") or []
-    has_support_image = bool(support_images)
-    has_support_text = bool(support_text)
     manual_review = question.get("manualReview") or {}
     manual_review_reasons_list = (
         [str(item) for item in manual_review.get("reasons", [])]
@@ -974,22 +1276,25 @@ def simulation_eligibility_reasons(question: dict[str, object]) -> list[str]:
         else []
     )
 
+    group_id = str(question.get("grupoApoioId") or "")
+    group_summary = support_groups.get(group_id) if group_id else None
+    group_questions = (
+        [question_lookup[item_id] for item_id in group_summary.get("questionIds", [])]
+        if group_summary
+        else []
+    )
+    if group_summary and not group_summary.get("eligibleSimulado", True):
+        reasons.extend(
+            str(reason)
+            for reason in group_summary.get("motivosInelegibilidadeSimulado", [])
+        )
+    group_has_text_support = any(question_has_text_support(item) for item in group_questions) or question_has_text_support(question)
+    group_has_image_support = any(question_has_image_support(item) for item in group_questions) or question_has_image_support(question)
+
     if status != "completa":
         reasons.append("status_diferente_de_completa")
     if not statement:
         reasons.append("enunciado_incompleto")
-    if matches_any_rule(normalized_statement, SIMULATION_TEXT_REFERENCE_PATTERNS):
-        reasons.append("depende_de_conteudo_anterior")
-    if (
-        matches_any_rule(normalized_statement, SIMULATION_TEXT_SUPPORT_PATTERNS)
-        and not (has_support_text or has_support_image)
-    ):
-        reasons.append("texto_de_apoio_ausente")
-    if (
-        matches_any_rule(normalized_statement, SIMULATION_VISUAL_SUPPORT_PATTERNS)
-        and not has_support_image
-    ):
-        reasons.append("imagem_de_apoio_ausente")
     if not simulation_alternatives_are_legible(alternatives):
         reasons.append("alternativas_incompletas_ou_ilegiveis")
     if answer not in EXPECTED_ALTERNATIVE_LETTERS:
@@ -1004,6 +1309,20 @@ def simulation_eligibility_reasons(question: dict[str, object]) -> list[str]:
         reasons.append("alternativas_incompletas_ou_ilegiveis")
     if "expressao_complexa_para_latex" in manual_review_reasons_list:
         reasons.append("expressao_matematica_ilegivel")
+
+    requires_text_support = bool(markers & {"texto_i", "texto_ii", "texto_iii", "texto_anterior", "questao_anterior"})
+    requires_visual_support = bool(markers & {"figura", "imagem", "mapa", "grafico", "tabela", "tirinha"})
+
+    if requires_text_support and not (group_has_text_support or group_has_image_support):
+        reasons.append("texto_de_apoio_ausente")
+    if requires_visual_support and not group_has_image_support:
+        reasons.append("imagem_de_apoio_ausente")
+
+    if (
+        matches_any_rule(normalized_statement, SIMULATION_TEXT_REFERENCE_PATTERNS)
+        and not (group_has_text_support or group_has_image_support)
+    ):
+        reasons.append("depende_de_conteudo_anterior")
 
     unique_reasons: list[str] = []
     for reason in reasons:
@@ -2040,7 +2359,23 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
             for src in by_year[year]["sources"]
             if src["kind"] in {"prova", "prova-gabarito"}
         ]
+        explicit_answer_source = next(
+            (src for src in by_year[year]["sources"] if src["kind"] == "gabarito"),
+            None,
+        )
         proof_source = proof_sources[0] if proof_sources else None
+        answer_reference_source = (
+            explicit_answer_source
+            or answer_source_by_year.get(year)
+            or next(
+                (
+                    src
+                    for src in by_year[year]["sources"]
+                    if src["kind"] == "prova-gabarito"
+                ),
+                None,
+            )
+        )
         extracted_questions = by_year[year]["questions"]
         answers = chosen_answers.get(year, {})
         available_numbers = sorted(set(extracted_questions.keys()) | set(answers.keys()))
@@ -2153,11 +2488,15 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
                     "conteudoResumo": content_summary,
                     "prioridade": priority,
                     "sourcePdf": proof_source.get("pdf") if proof_source else None,
-                    "answerPdf": answer_source_by_year.get(year, {}).get("pdf"),
+                    "answerPdf": answer_reference_source.get("pdf")
+                    if answer_reference_source
+                    else None,
                     "hasExtractedText": bool(question_text.get("statement")),
                     "images": [],
                     "imagemApoio": [],
                     "apoioTipos": [],
+                    "grupoApoioId": None,
+                    "ordemNoGrupo": None,
                     "resolution": normalized_resolution,
                     "status": status,
                     "elegivelSimulado": False,
@@ -2202,7 +2541,70 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
         }
         if question.get("status") == "completa" and "alternativa_com_texto_estranho" in review_reasons:
             question["status"] = "revisar"
-        simulation_reasons = simulation_eligibility_reasons(question)
+
+    support_groups, question_group_ids = build_support_groups(questions)
+    question_lookup = {str(question.get("id")): question for question in questions}
+
+    support_group_summaries: list[dict[str, object]] = []
+    for group_id, group in support_groups.items():
+        group_questions = [question_lookup[item_id] for item_id in group.get("questionIds", [])]
+        group_reasons: list[str] = []
+        if not group.get("supportQuestionIds"):
+            group_reasons.append("apoio_ausente_no_grupo")
+        elif not question_has_text_support(group_questions[0]) and not question_has_image_support(
+            group_questions[0]
+        ):
+            group_reasons.append("apoio_nao_aparece_no_inicio_do_grupo")
+        if any(str(item.get("status") or "") != "completa" for item in group_questions):
+            group_reasons.append("grupo_com_questoes_incompletas")
+        if any(
+            not simulation_alternatives_are_legible(
+                [alt for alt in (item.get("alternatives") or []) if isinstance(alt, dict)]
+            )
+            for item in group_questions
+        ):
+            group_reasons.append("grupo_com_alternativas_incompletas")
+        if any(
+            str(item.get("answer") or "").strip().upper() not in EXPECTED_ALTERNATIVE_LETTERS
+            for item in group_questions
+        ):
+            group_reasons.append("grupo_com_gabarito_invalido")
+        if any(
+            "expressao_complexa_para_latex"
+            in (item.get("manualReview") or {}).get("reasons", [])
+            for item in group_questions
+        ):
+            group_reasons.append("grupo_com_expressao_ilegivel")
+
+        unique_group_reasons: list[str] = []
+        for reason in group_reasons:
+            if reason not in unique_group_reasons:
+                unique_group_reasons.append(reason)
+
+        availability = group_mode_availability(
+            len(group.get("questionIds", [])),
+            str(group.get("discipline") or ""),
+        )
+        support_group_summaries.append(
+            {
+                **group,
+                "eligibleSimulado": not unique_group_reasons,
+                "motivosInelegibilidadeSimulado": unique_group_reasons,
+                "modeAvailability": availability,
+            }
+        )
+
+    support_group_lookup = {
+        str(group["id"]): group for group in support_group_summaries
+    }
+
+    for question in questions:
+        question["grupoApoioId"] = question_group_ids.get(str(question.get("id")))
+        simulation_reasons = simulation_eligibility_reasons(
+            question,
+            support_group_lookup,
+            question_lookup,
+        )
         question["motivosInelegibilidadeSimulado"] = simulation_reasons
         question["elegivelSimulado"] = not simulation_reasons
 
@@ -2277,6 +2679,10 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
         "title": "Preparatório IFFluminense",
         "sources": sources,
         "questions": questions,
+        "supportGroups": sorted(
+            support_group_summaries,
+            key=lambda item: (int(item.get("year", 0)), str(item.get("discipline") or ""), item["questionIds"]),
+        ),
         "descriptors": sorted(
             descriptor_usage.values(),
             key=lambda item: (str(item["discipline"]), str(item["code"])),
@@ -2326,6 +2732,8 @@ def build_catalog(resolutions_source: dict[str, dict[str, object]]) -> dict[str,
                 for item in questions
                 if item.get("status") == "completa" and not item.get("elegivelSimulado")
             ),
+            "supportGroups": len(support_group_summaries),
+            "groupedQuestions": sum(len(group.get("questionIds", [])) for group in support_group_summaries),
             "simuladoBlueprint": simulado_blueprint,
             "statusCounts": {
                 status: sum(1 for item in questions if item.get("status") == status)

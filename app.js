@@ -411,6 +411,11 @@ function normalizeQuestion(rawQuestion) {
     apoioTipos: Array.isArray(rawQuestion.apoioTipos)
       ? rawQuestion.apoioTipos.map((item) => String(item).trim()).filter(Boolean)
       : [],
+    grupoApoioId: rawQuestion.grupoApoioId ? String(rawQuestion.grupoApoioId) : null,
+    ordemNoGrupo:
+      rawQuestion.ordemNoGrupo === null || rawQuestion.ordemNoGrupo === undefined
+        ? null
+        : Number(rawQuestion.ordemNoGrupo || 0) || null,
     resolution: normalizeResolution(rawQuestion.resolution),
     status: String(rawQuestion.status || ""),
     manualReview:
@@ -754,6 +759,160 @@ function referenceMarkup(question) {
           .map((item) => `<p class="reference-item">${escapeHtml(item)}</p>`)
           .join("")}
       </div>
+    </section>
+  `;
+}
+
+function supportItemMarkup(item, label = "") {
+  const text = String(item?.textoApoio || "").trim();
+  const images = Array.isArray(item?.images) ? item.images : [];
+  const references = Array.isArray(item?.fonteReferencia) ? item.fonteReferencia : [];
+  if (!text && !images.length && !references.length) return "";
+
+  return `
+    <div class="shared-support-item">
+      ${label ? `<p class="shared-support-label">${escapeHtml(label)}</p>` : ""}
+      ${text ? `<pre class="support-text">${escapeHtml(text)}</pre>` : ""}
+      ${
+        images.length
+          ? `
+            <div class="question-images">
+              ${images
+                .map(
+                  (image, index) => `
+                    <figure class="question-image">
+                      <a href="${escapeHtml(image.src)}" target="_blank" rel="noreferrer">
+                        <img src="${escapeHtml(image.src)}" alt="${escapeHtml(
+                          image.alt || `Elemento visual ${index + 1}`,
+                        )}" loading="lazy" />
+                      </a>
+                      <figcaption>Elemento visual ${index + 1} · página ${escapeHtml(
+                        image.page,
+                      )}</figcaption>
+                    </figure>
+                  `,
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+      ${
+        references.length
+          ? `
+            <div class="reference-list">
+              ${references
+                .map((reference) => `<p class="reference-item">${escapeHtml(reference)}</p>`)
+                .join("")}
+            </div>
+          `
+          : ""
+      }
+    </div>
+  `;
+}
+
+function groupSupportMarkup(question) {
+  const supportItems = question.apoioGrupo?.items || [];
+  if (!supportItems.length) return "";
+
+  return `
+    <section class="support-block is-shared-support">
+      <strong class="support-title">Apoio do bloco</strong>
+      ${supportItems
+        .map((item) =>
+          supportItemMarkup(
+            item,
+            supportItems.length > 1 ? `Material da questão ${String(item.questionNumber || "")}` : "",
+          ),
+        )
+        .join("")}
+    </section>
+  `;
+}
+
+function simulationSupportMarkup(question) {
+  const isGrouped = Boolean(question.grupoApoioId && question.grupoApoioTamanho > 1);
+  if (!isGrouped) {
+    return `${supportTextMarkup(question)}${questionImages(question)}${referenceMarkup(question)}`;
+  }
+
+  if (question.grupoApoioPrimeiraQuestao) {
+    const groupMarkup = groupSupportMarkup(question);
+    if (groupMarkup) return groupMarkup;
+    return `${supportTextMarkup(question)}${questionImages(question)}${referenceMarkup(question)}`;
+  }
+
+  return `
+    <section class="support-block is-shared-support is-shared-support-note">
+      <strong class="support-title">Apoio do bloco</strong>
+      <p class="reference-item">O material de apoio deste bloco foi exibido apenas na primeira questão.</p>
+    </section>
+  `;
+}
+
+function sharedSupportMarkup(question) {
+  const sharedItems = question.apoioCompartilhado?.items || [];
+  const hasOwnSupport =
+    questionSupportText(question) ||
+    questionSupportImages(question).length ||
+    question.fonteReferencia?.length;
+  if (!sharedItems.length || hasOwnSupport) return "";
+
+  return `
+    <section class="support-block is-shared-support">
+      <strong class="support-title">Apoio deste bloco</strong>
+      ${sharedItems
+        .map(
+          (item) => `
+            <div class="shared-support-item">
+              <p class="shared-support-label">Material da questão ${escapeHtml(
+                String(item.questionNumber || ""),
+              )}</p>
+              ${
+                item.textoApoio
+                  ? `<pre class="support-text">${escapeHtml(String(item.textoApoio || ""))}</pre>`
+                  : ""
+              }
+              ${
+                Array.isArray(item.images) && item.images.length
+                  ? `
+                    <div class="question-images">
+                      ${item.images
+                        .map(
+                          (image, index) => `
+                            <figure class="question-image">
+                              <a href="${escapeHtml(image.src)}" target="_blank" rel="noreferrer">
+                                <img src="${escapeHtml(image.src)}" alt="${escapeHtml(
+                                  image.alt || `Elemento visual ${index + 1}`,
+                                )}" loading="lazy" />
+                              </a>
+                              <figcaption>Elemento visual ${index + 1} · página ${escapeHtml(
+                                image.page,
+                              )}</figcaption>
+                            </figure>
+                          `,
+                        )
+                        .join("")}
+                    </div>
+                  `
+                  : ""
+              }
+              ${
+                Array.isArray(item.fonteReferencia) && item.fonteReferencia.length
+                  ? `
+                    <div class="reference-list">
+                      ${item.fonteReferencia
+                        .map((reference) => `<p class="reference-item">${escapeHtml(reference)}</p>`)
+                        .join("")}
+                    </div>
+                  `
+                  : ""
+              }
+            </div>
+          `,
+        )
+        .join("")}
     </section>
   `;
 }
@@ -1424,11 +1583,16 @@ function simulationRunningMarkup(session) {
           <span class="pill">Questão ${String(question.order).padStart(2, "0")}</span>
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
           <span class="pill">${escapeHtml(String(question.year))}</span>
+          ${
+            question.grupoApoioId && question.grupoApoioTamanho > 1
+              ? `<span class="pill">Bloco ${escapeHtml(String(question.ordemNoGrupo || 1))}/${escapeHtml(
+                  String(question.grupoApoioTamanho || 1),
+                )}</span>`
+              : ""
+          }
         </div>
         <h2 class="question-title">${escapeHtml(question.area || `Questão ${question.order}`)}</h2>
-        ${supportTextMarkup(question)}
-        ${questionImages(question)}
-        ${referenceMarkup(question)}
+        ${simulationSupportMarkup(question)}
         ${
           question.statement
             ? `<pre class="statement">${escapeHtml(question.statement)}</pre>`
@@ -1902,12 +2066,17 @@ function simulationRunningMarkupEnhanced(session) {
           <span class="pill">Questão ${String(question.order).padStart(2, "0")}</span>
           <span class="pill is-discipline">${escapeHtml(question.discipline)}</span>
           <span class="pill">${escapeHtml(String(question.year))}</span>
+          ${
+            question.grupoApoioId && question.grupoApoioTamanho > 1
+              ? `<span class="pill">Bloco ${escapeHtml(String(question.ordemNoGrupo || 1))}/${escapeHtml(
+                  String(question.grupoApoioTamanho || 1),
+                )}</span>`
+              : ""
+          }
         </div>
         <h2 class="question-title">${escapeHtml(question.area || `Questão ${question.order}`)}</h2>
         ${isReview ? simulationReviewSummary(question) : ""}
-        ${supportTextMarkup(question)}
-        ${questionImages(question)}
-        ${referenceMarkup(question)}
+        ${simulationSupportMarkup(question)}
         ${
           question.statement
             ? `<pre class="statement">${escapeHtml(question.statement)}</pre>`
